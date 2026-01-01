@@ -1,0 +1,10 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+        {
+			"label": "Debug WindowsDX Build",
+			"type": "shell",
+			"command": "dotnet build -p:Configuration=Debug ${workspaceFolder}/Platformer2D.WindowsDX/Platformer2D.WindowsDX.csproj"
+		},
+	]
+}
