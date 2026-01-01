@@ -12,7 +12,7 @@
     <ApplicationIcon>Icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <MonoGameContentReference Include="..\Platformer2D.Core\Content\Platformer2D.mgcb" Link="Content\Platformer2D.mgcb" />
+    <MonoGameContentReference Include="..\ProjectZeus.Core\Content\Platformer2D.mgcb" Link="Content\Platformer2D.mgcb" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MonoGame.Framework.WindowsDX" Version="3.8.4.1" />
