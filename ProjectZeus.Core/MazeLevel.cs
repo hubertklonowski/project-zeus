@@ -113,6 +113,18 @@ namespace ProjectZeus.Core
                     stack.Pop();
                 }
             }
+            
+            // Ensure outer border is always walls to prevent going off-screen
+            for (int x = 0; x < mazeWidth; x++)
+            {
+                walls[x, 0] = true;
+                walls[x, mazeHeight - 1] = true;
+            }
+            for (int y = 0; y < mazeHeight; y++)
+            {
+                walls[0, y] = true;
+                walls[mazeWidth - 1, y] = true;
+            }
         }
         
         private List<Point> GetUnvisitedNeighbors(Point cell)
