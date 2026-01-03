@@ -16,6 +16,9 @@ namespace ProjectZeus.Core
         private Texture2D solidTexture;
         private SpriteFont font;
         
+        // Random number generator for rock throwing
+        private static readonly System.Random random = new System.Random();
+        
         // Mountain platforms
         private List<Platform> platforms;
         
@@ -56,12 +59,13 @@ namespace ProjectZeus.Core
             // Build the mountain structure with platforms
             SetupMountain();
             
-            // Position goat at top of mountain
-            goatPosition = new Vector2(baseScreenSize.X / 2f - goatSize.X / 2f, 60f);
+            // Position goat at top of mountain (standing on the top platform)
+            float topPlatformY = 100f;
+            goatPosition = new Vector2(baseScreenSize.X / 2f - 60f, topPlatformY - goatSize.Y);
             goatThrowTimer = GoatThrowInterval;
             
-            // Position item next to goat at mountain top
-            itemPosition = new Vector2(goatPosition.X + 60f, goatPosition.Y + 5f);
+            // Position item next to goat at mountain top (also on the platform)
+            itemPosition = new Vector2(baseScreenSize.X / 2f + 30f, topPlatformY - itemSize.Y);
         }
         
         private void SetupMountain()
@@ -76,72 +80,115 @@ namespace ProjectZeus.Core
                 Color = new Color(100, 80, 60)
             });
             
-            // Mountain platforms going up - creating a climbing path
-            // Left side platforms
+            // Mountain platforms going up - creating a clear climbing path
+            // Level 1 - Low platforms (easier to reach from ground)
             platforms.Add(new Platform
             {
-                Position = new Vector2(50, 390),
+                Position = new Vector2(100, 400),
                 Size = new Vector2(120, 15),
                 Color = new Color(120, 100, 80)
             });
             
             platforms.Add(new Platform
             {
-                Position = new Vector2(180, 330),
-                Size = new Vector2(100, 15),
+                Position = new Vector2(280, 390),
+                Size = new Vector2(110, 15),
                 Color = new Color(120, 100, 80)
             });
             
-            // Right side platforms
             platforms.Add(new Platform
             {
-                Position = new Vector2(500, 380),
+                Position = new Vector2(480, 400),
+                Size = new Vector2(120, 15),
+                Color = new Color(120, 100, 80)
+            });
+            
+            // Level 2 - Mid-low platforms
+            platforms.Add(new Platform
+            {
+                Position = new Vector2(150, 330),
+                Size = new Vector2(110, 15),
+                Color = new Color(120, 100, 80)
+            });
+            
+            platforms.Add(new Platform
+            {
+                Position = new Vector2(340, 320),
+                Size = new Vector2(120, 15),
+                Color = new Color(120, 100, 80)
+            });
+            
+            platforms.Add(new Platform
+            {
+                Position = new Vector2(520, 330),
+                Size = new Vector2(110, 15),
+                Color = new Color(120, 100, 80)
+            });
+            
+            // Level 3 - Middle platforms
+            platforms.Add(new Platform
+            {
+                Position = new Vector2(100, 260),
+                Size = new Vector2(120, 15),
+                Color = new Color(120, 100, 80)
+            });
+            
+            platforms.Add(new Platform
+            {
+                Position = new Vector2(300, 250),
                 Size = new Vector2(130, 15),
                 Color = new Color(120, 100, 80)
             });
             
             platforms.Add(new Platform
             {
-                Position = new Vector2(540, 310),
+                Position = new Vector2(500, 260),
+                Size = new Vector2(120, 15),
+                Color = new Color(120, 100, 80)
+            });
+            
+            // Level 4 - Upper platforms
+            platforms.Add(new Platform
+            {
+                Position = new Vector2(150, 190),
                 Size = new Vector2(110, 15),
                 Color = new Color(120, 100, 80)
             });
             
-            // Middle platforms
             platforms.Add(new Platform
             {
-                Position = new Vector2(300, 260),
-                Size = new Vector2(140, 15),
-                Color = new Color(120, 100, 80)
-            });
-            
-            platforms.Add(new Platform
-            {
-                Position = new Vector2(150, 200),
+                Position = new Vector2(340, 180),
                 Size = new Vector2(120, 15),
                 Color = new Color(120, 100, 80)
             });
             
             platforms.Add(new Platform
             {
-                Position = new Vector2(470, 190),
+                Position = new Vector2(520, 190),
+                Size = new Vector2(110, 15),
+                Color = new Color(120, 100, 80)
+            });
+            
+            // Level 5 - Near top
+            platforms.Add(new Platform
+            {
+                Position = new Vector2(250, 130),
                 Size = new Vector2(120, 15),
                 Color = new Color(120, 100, 80)
             });
             
-            // Near top platforms
             platforms.Add(new Platform
             {
-                Position = new Vector2(320, 140),
-                Size = new Vector2(100, 15),
+                Position = new Vector2(430, 130),
+                Size = new Vector2(120, 15),
                 Color = new Color(120, 100, 80)
             });
             
-            // Top platform (where goat and item are)
+            // Top platform (where goat and item are) - wide and accessible
             platforms.Add(new Platform
             {
-                Position = new Vector2(baseScreenSize.X / 2f - 80f, 100),
-                Size = new Vector2(160, 15),
+                Position = new Vector2(baseScreenSize.X / 2f - 100f, 100),
+                Size = new Vector2(200, 15),
                 Color = new Color(140, 120, 100)
             });
         }
@@ -219,7 +266,7 @@ namespace ProjectZeus.Core
         private void ThrowRock()
         {
             // Goat throws rock downward with some randomness
-            float angle = MathHelper.ToRadians(90f + (float)(new System.Random().NextDouble() * 40 - 20)); // 70-110 degrees
+            float angle = MathHelper.ToRadians(90f + (float)(random.NextDouble() * 40 - 20)); // 70-110 degrees
             float speed = 200f;
             
             rocks.Add(new Rock
