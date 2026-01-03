@@ -44,6 +44,7 @@ namespace ProjectZeus.Core
         // We store our input states so that we only poll once per frame.
         private GamePadState gamePadState;
         private KeyboardState keyboardState;
+        private KeyboardState previousKeyboardState;
         private TouchCollection touchState;
 
         private VirtualGamePad virtualGamePad;
@@ -288,14 +289,14 @@ namespace ProjectZeus.Core
                 playerPosition.X = baseScreenSize.X - playerSize.X;
 
             // Press M to enter the mine level
-            if (keyboardState.IsKeyDown(Keys.M) && !inMineLevel)
+            if (keyboardState.IsKeyDown(Keys.M) && !previousKeyboardState.IsKeyDown(Keys.M) && !inMineLevel)
             {
                 LoadMineLevel();
                 return; // Exit this update, next frame will use mine level update
             }
 
             // Interaction: press E near a pillar to insert an item (if we have one).
-            if (keyboardState.IsKeyDown(Keys.E) && collectedItem != null)
+            if (keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E) && collectedItem != null)
             {
                 TryInsertItemAtPlayer();
             }
@@ -369,7 +370,7 @@ namespace ProjectZeus.Core
             mineLevel.Update(gameTime, keyboardState, gamePadState, new AccelerometerState(Vector3.Zero, false), DisplayOrientation.LandscapeLeft);
 
             // Check if player presses E to collect an item
-            if (keyboardState.IsKeyDown(Keys.E) && collectedItem == null)
+            if (keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E) && collectedItem == null)
             {
                 collectedItem = mineLevel.TryCollectPillarItem(mineLevel.Player.BoundingRectangle);
             }
@@ -451,6 +452,9 @@ namespace ProjectZeus.Core
 
         private void HandleInput(GameTime gameTime)
         {
+            // Save previous state before getting new state
+            previousKeyboardState = keyboardState;
+            
             // get all of our input states
             keyboardState = Keyboard.GetState();
             touchState = TouchPanel.GetState();
