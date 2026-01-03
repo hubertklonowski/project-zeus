@@ -12,8 +12,8 @@ namespace ProjectZeus.Core
     public class MazeLevel
     {
         private readonly Vector2 baseScreenSize = new Vector2(800, 480);
-        private readonly int mazeWidth = 25;
-        private readonly int mazeHeight = 15;
+        private readonly int mazeWidth = 41;  // Increased from 25 for bigger maze
+        private readonly int mazeHeight = 25; // Increased from 15 for bigger maze
         private readonly int cellSize = 32;
         
         // Maze data
@@ -45,7 +45,7 @@ namespace ProjectZeus.Core
         private const int visibilityRadius = 4; // cells visible around player
         
         // Configuration constants
-        private const float minItemDistanceFromPlayer = 300f;
+        private const float minItemDistanceFromPlayer = 600f; // Increased from 300f to hide item better
         private const float minMinotaurSpawnDistance = 150f;
         private const double minotaurDirectionChangeChance = 0.02; // 2% chance per frame
         
@@ -355,7 +355,14 @@ namespace ProjectZeus.Core
                 Vector2 pushDir = playerPosition - minotaurPosition;
                 if (pushDir.LengthSquared() > 0)
                     pushDir.Normalize();
-                playerPosition += pushDir * 50f * dt;
+                
+                Vector2 pushedPosition = playerPosition + pushDir * 50f * dt;
+                
+                // Only apply push if it doesn't push player into a wall
+                if (!CheckWallCollision(pushedPosition, playerSize))
+                {
+                    playerPosition = pushedPosition;
+                }
             }
         }
         

@@ -74,6 +74,11 @@ namespace ProjectZeus.Core
         private MazeLevel mazeLevel;
         private bool hasCollectedItem;
         private KeyboardState previousKeyboardState;
+        
+        // Portal for maze entrance
+        private Vector2 portalPosition;
+        private Vector2 portalSize = new Vector2(60, 80);
+        private Texture2D portalTexture;
 
         public PlatformerGame()
         {
@@ -130,6 +135,7 @@ namespace ProjectZeus.Core
             slotTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(200, 200, 255));
             skyTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(135, 206, 235));
             playerTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(255, 220, 180));
+            portalTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(100, 50, 200)); // Purple portal
 
             // Set up three pillars across the base screen, starting from the bottom.
             float centerX = baseScreenSize.X / 2f;
@@ -156,6 +162,9 @@ namespace ProjectZeus.Core
             playerPosition = new Vector2(centerX - spacing - 80f, groundTop - playerSize.Y);
             playerVelocity = Vector2.Zero;
             isOnGround = true;
+            
+            // Place portal on the right side of the screen
+            portalPosition = new Vector2(baseScreenSize.X - 100f, groundTop - portalSize.Y);
 
             inZeusFightScene = false;
             zeusFightScene = new ZeusFightScene();
@@ -291,19 +300,27 @@ namespace ProjectZeus.Core
             if (playerPosition.X + playerSize.X > baseScreenSize.X)
                 playerPosition.X = baseScreenSize.X - playerSize.X;
 
-            // Interaction: press M to enter maze level, press E near a pillar to insert an item
+            // Interaction: press E near a pillar to insert an item
             bool eKeyPressed = keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E);
-            bool mKeyPressed = keyboardState.IsKeyDown(Keys.M) && !previousKeyboardState.IsKeyDown(Keys.M);
             
             if (eKeyPressed && hasCollectedItem)
             {
                 TryInsertItemAtPlayer();
             }
             
-            if (mKeyPressed && !hasCollectedItem)
+            // Check portal collision to enter maze (only when not carrying item)
+            if (!hasCollectedItem)
             {
-                // Enter maze level to collect an item
-                inMazeLevel = true;
+                Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, 
+                                                     (int)playerSize.X, (int)playerSize.Y);
+                Rectangle portalRect = new Rectangle((int)portalPosition.X, (int)portalPosition.Y,
+                                                     (int)portalSize.X, (int)portalSize.Y);
+                
+                if (playerRect.Intersects(portalRect))
+                {
+                    // Enter maze level to collect an item
+                    inMazeLevel = true;
+                }
             }
 
             // Check if all items have been inserted; if so, switch to ZeusFightScene.
@@ -514,6 +531,32 @@ namespace ProjectZeus.Core
                 }
             }
 
+            // Draw portal (if player doesn't have an item)
+            if (!hasCollectedItem)
+            {
+                Rectangle portalRect = new Rectangle((int)portalPosition.X, (int)portalPosition.Y,
+                                                     (int)portalSize.X, (int)portalSize.Y);
+                
+                // Animated portal effect using time
+                float portalTime = (float)gameTime.TotalGameTime.TotalSeconds;
+                float pulse = (float)(Math.Sin(portalTime * 3) * 0.3 + 0.7); // Pulsing effect
+                
+                // Draw portal base
+                spriteBatch.Draw(portalTexture, portalRect, new Color(100, 50, 200) * pulse);
+                
+                // Draw portal inner glow
+                Rectangle innerRect = portalRect;
+                innerRect.Inflate(-8, -8);
+                spriteBatch.Draw(portalTexture, innerRect, new Color(150, 100, 255) * pulse);
+                
+                // Draw portal core
+                Rectangle coreRect = portalRect;
+                coreRect.Inflate(-16, -16);
+                spriteBatch.Draw(portalTexture, coreRect, Color.White * pulse);
+                
+                DrawRectangleOutline(portalRect, new Color(150, 100, 255));
+            }
+
             // Draw the player.
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
             spriteBatch.Draw(playerTexture, playerRect, Color.White);
@@ -535,7 +578,7 @@ namespace ProjectZeus.Core
             // Instructions
             string instructions = hasCollectedItem 
                 ? "Press E near an empty pillar to place the item" 
-                : "Press M to enter the maze and find an item";
+                : "Walk into the portal to enter the maze";
             Vector2 instructionsSize = hudFont.MeasureString(instructions);
             Vector2 instructionsPos = new Vector2((baseScreenSize.X - instructionsSize.X) / 2f, 70f);
             spriteBatch.DrawString(hudFont, instructions, instructionsPos, Color.White);
