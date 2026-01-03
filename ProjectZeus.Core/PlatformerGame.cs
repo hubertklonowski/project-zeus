@@ -83,6 +83,11 @@ namespace ProjectZeus.Core
         private Vector2 minePlayerVelocity;
         private bool minePlayerOnGround;
         private List<Rectangle> minePlatforms;
+        private List<Rectangle> mineRails;  // Rails for visual decoration
+        private List<MineCart> mineCarts;   // Moving carts
+        private List<MineBat> mineBats;     // Flying bats
+        private List<Rectangle> mineStalactites;  // Hanging stalactites
+        private List<Rectangle> mineTorches;      // Light sources
         private Rectangle mineExitRect;
         private Rectangle mineItemRect;
         private bool mineItemCollected;
@@ -234,12 +239,85 @@ namespace ProjectZeus.Core
 
         private void LoadMineLevel()
         {
-            // Simple mine level - just reset player position and flags
+            // Simple mine level - reset player and create a MUCH BIGGER, more interesting cave
             inMineLevel = true;
             mineItemCollected = false;
             minePlayerPosition = new Vector2(50f, baseScreenSize.Y - playerSize.Y - 30f);
             minePlayerVelocity = Vector2.Zero;
             minePlayerOnGround = false;
+
+            // Clear and rebuild platforms for a BIGGER cave experience
+            minePlatforms.Clear();
+            
+            // Ground
+            minePlatforms.Add(new Rectangle(0, (int)(baseScreenSize.Y - 20), (int)baseScreenSize.X, 20));
+            
+            // Many more platforms at various heights for exploration
+            minePlatforms.Add(new Rectangle(50, (int)(baseScreenSize.Y - 120), 180, 15));
+            minePlatforms.Add(new Rectangle(250, (int)(baseScreenSize.Y - 180), 120, 15));
+            minePlatforms.Add(new Rectangle(400, (int)(baseScreenSize.Y - 240), 150, 15));
+            minePlatforms.Add(new Rectangle(180, (int)(baseScreenSize.Y - 280), 100, 15));
+            minePlatforms.Add(new Rectangle(320, (int)(baseScreenSize.Y - 340), 160, 15));
+            minePlatforms.Add(new Rectangle(550, (int)(baseScreenSize.Y - 200), 180, 15));
+            minePlatforms.Add(new Rectangle(600, (int)(baseScreenSize.Y - 100), 150, 15)); // Exit platform
+            
+            // Create rails (visual decoration on some platforms)
+            mineRails = new List<Rectangle>();
+            mineRails.Add(new Rectangle(50, (int)(baseScreenSize.Y - 125), 180, 5));  // Rail on platform 1
+            mineRails.Add(new Rectangle(550, (int)(baseScreenSize.Y - 205), 180, 5)); // Rail on platform 6
+            
+            // Create carts moving on rails
+            mineCarts = new List<MineCart>();
+            var random = new Random();
+            
+            mineCarts.Add(new MineCart 
+            { 
+                Position = new Vector2(100, baseScreenSize.Y - 140), 
+                Velocity = new Vector2(40, 0),
+                MinX = 60,
+                MaxX = 220
+            });
+            
+            mineCarts.Add(new MineCart 
+            { 
+                Position = new Vector2(600, baseScreenSize.Y - 220), 
+                Velocity = new Vector2(-50, 0),
+                MinX = 560,
+                MaxX = 720
+            });
+            
+            // Create bats flying around
+            mineBats = new List<MineBat>();
+            for (int i = 0; i < 4; i++)
+            {
+                mineBats.Add(new MineBat
+                {
+                    Position = new Vector2(200 + i * 150, 150 + i * 40),
+                    Velocity = new Vector2((float)(random.NextDouble() * 2 - 1) * 60f, (float)(random.NextDouble() * 2 - 1) * 60f),
+                    ChangeDirectionTimer = (float)random.NextDouble() * 2f
+                });
+            }
+            
+            // Create stalactites hanging from ceiling
+            mineStalactites = new List<Rectangle>();
+            for (int x = 100; x < 700; x += 80)
+            {
+                int height = 30 + random.Next(30);
+                mineStalactites.Add(new Rectangle(x, 0, 20, height));
+            }
+            
+            // Create torches for atmosphere
+            mineTorches = new List<Rectangle>();
+            mineTorches.Add(new Rectangle(30, (int)(baseScreenSize.Y - 50), 15, 25));
+            mineTorches.Add(new Rectangle(230, (int)(baseScreenSize.Y - 210), 15, 25));
+            mineTorches.Add(new Rectangle(580, (int)(baseScreenSize.Y - 230), 15, 25));
+            mineTorches.Add(new Rectangle(730, (int)(baseScreenSize.Y - 130), 15, 25));
+            
+            // Item to collect (on middle-upper platform)
+            mineItemRect = new Rectangle(350, (int)(baseScreenSize.Y - 280), 30, 30);
+            
+            // Exit portal (on far right upper platform)
+            mineExitRect = new Rectangle(670, (int)(baseScreenSize.Y - 150), 50, 50);
         }
 
         /// <summary>
@@ -468,6 +546,25 @@ namespace ProjectZeus.Core
             if (minePlayerPosition.X + playerSize.X > baseScreenSize.X)
                 minePlayerPosition.X = baseScreenSize.X - playerSize.X;
 
+            // Update carts
+            if (mineCarts != null)
+            {
+                foreach (var cart in mineCarts)
+                {
+                    cart.Update(dt);
+                }
+            }
+
+            // Update bats
+            if (mineBats != null)
+            {
+                var random = new Random();
+                foreach (var bat in mineBats)
+                {
+                    bat.Update(dt, random);
+                }
+            }
+
             // Check if player collects the item
             if (!mineItemCollected && keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E))
             {
@@ -523,10 +620,63 @@ namespace ProjectZeus.Core
                 Rectangle bgRect = new Rectangle(0, 0, (int)baseScreenSize.X, (int)baseScreenSize.Y);
                 spriteBatch.Draw(mineBackgroundTexture, bgRect, Color.White);
 
+                // Draw stalactites
+                if (mineStalactites != null)
+                {
+                    foreach (Rectangle stalactite in mineStalactites)
+                    {
+                        spriteBatch.Draw(minePlatformTexture, stalactite, new Color(120, 120, 120));
+                    }
+                }
+
                 // Draw platforms
                 foreach (Rectangle platform in minePlatforms)
                 {
                     spriteBatch.Draw(minePlatformTexture, platform, new Color(80, 70, 60));
+                }
+
+                // Draw rails
+                if (mineRails != null)
+                {
+                    foreach (Rectangle rail in mineRails)
+                    {
+                        spriteBatch.Draw(minePlatformTexture, rail, new Color(140, 140, 140));
+                        // Draw rail ties
+                        for (int x = rail.Left; x < rail.Right; x += 15)
+                        {
+                            Rectangle tie = new Rectangle(x, rail.Top - 3, 3, 8);
+                            spriteBatch.Draw(minePlatformTexture, tie, new Color(100, 70, 50));
+                        }
+                    }
+                }
+
+                // Draw carts
+                if (mineCarts != null)
+                {
+                    foreach (var cart in mineCarts)
+                    {
+                        spriteBatch.Draw(minePlatformTexture, cart.Bounds, new Color(139, 69, 19)); // Brown
+                        // Draw wheels
+                        Rectangle wheel1 = new Rectangle(cart.Bounds.Left + 5, cart.Bounds.Bottom - 5, 8, 8);
+                        Rectangle wheel2 = new Rectangle(cart.Bounds.Right - 13, cart.Bounds.Bottom - 5, 8, 8);
+                        spriteBatch.Draw(minePlatformTexture, wheel1, Color.Black);
+                        spriteBatch.Draw(minePlatformTexture, wheel2, Color.Black);
+                    }
+                }
+
+                // Draw torches
+                if (mineTorches != null)
+                {
+                    float flickerTime = (float)gameTime.TotalGameTime.TotalSeconds;
+                    foreach (Rectangle torch in mineTorches)
+                    {
+                        // Torch stick
+                        spriteBatch.Draw(minePlatformTexture, torch, new Color(101, 67, 33));
+                        // Flame
+                        float flicker = (float)Math.Sin(flickerTime * 8f) * 0.2f + 0.8f;
+                        Rectangle flame = new Rectangle(torch.X - 5, torch.Y - 15, torch.Width + 10, 15);
+                        spriteBatch.Draw(minePlatformTexture, flame, new Color((byte)(255 * flicker), (byte)(200 * flicker), 50));
+                    }
                 }
 
                 // Draw item if not collected
@@ -536,7 +686,24 @@ namespace ProjectZeus.Core
                     // Draw item glow
                     Rectangle glowRect = mineItemRect;
                     glowRect.Inflate(5, 5);
-                    spriteBatch.Draw(playerTexture, glowRect, new Color(255, 215, 0, 100));
+                    spriteBatch.Draw(playerTexture, glowRect, new Color((byte)255, (byte)215, (byte)0, (byte)100));
+                }
+
+                // Draw bats
+                if (mineBats != null)
+                {
+                    float wingTime = (float)gameTime.TotalGameTime.TotalSeconds;
+                    foreach (var bat in mineBats)
+                    {
+                        // Bat body
+                        spriteBatch.Draw(minePlatformTexture, bat.Bounds, new Color(80, 60, 90));
+                        // Wings
+                        float wingFlap = (float)Math.Sin(wingTime * 10f) * 5f;
+                        Rectangle leftWing = new Rectangle(bat.Bounds.Left - 8 + (int)wingFlap, bat.Bounds.Top + 5, 8, 5);
+                        Rectangle rightWing = new Rectangle(bat.Bounds.Right - (int)wingFlap, bat.Bounds.Top + 5, 8, 5);
+                        spriteBatch.Draw(minePlatformTexture, leftWing, new Color(60, 50, 70));
+                        spriteBatch.Draw(minePlatformTexture, rightWing, new Color(60, 50, 70));
+                    }
                 }
 
                 // Draw exit portal
@@ -748,6 +915,51 @@ namespace ProjectZeus.Core
             spriteBatch.Draw(pillarTexture, new Rectangle(rect.X, rect.Bottom - 2, rect.Width, 2), color);
             spriteBatch.Draw(pillarTexture, new Rectangle(rect.X, rect.Y, 2, rect.Height), color);
             spriteBatch.Draw(pillarTexture, new Rectangle(rect.Right - 2, rect.Y, 2, rect.Height), color);
+        }
+
+        // Simple mine cart class for moving obstacles/decoration
+        private class MineCart
+        {
+            public Vector2 Position;
+            public Vector2 Velocity;
+            public float MinX, MaxX;
+            public Rectangle Bounds => new Rectangle((int)Position.X - 20, (int)Position.Y - 15, 40, 30);
+
+            public void Update(float dt)
+            {
+                Position.X += Velocity.X * dt;
+                if (Position.X < MinX || Position.X > MaxX)
+                {
+                    Velocity.X = -Velocity.X;
+                    Position.X = Math.Max(MinX, Math.Min(MaxX, Position.X));
+                }
+            }
+        }
+
+        // Simple bat class for flying around
+        private class MineBat
+        {
+            public Vector2 Position;
+            public Vector2 Velocity;
+            public float ChangeDirectionTimer;
+            public Rectangle Bounds => new Rectangle((int)Position.X - 10, (int)Position.Y - 10, 20, 20);
+
+            public void Update(float dt, Random random)
+            {
+                ChangeDirectionTimer -= dt;
+                if (ChangeDirectionTimer <= 0)
+                {
+                    Velocity = new Vector2((float)(random.NextDouble() * 2 - 1) * 60f, (float)(random.NextDouble() * 2 - 1) * 60f);
+                    ChangeDirectionTimer = 2f;
+                }
+                Position += Velocity * dt;
+                
+                // Keep in bounds
+                if (Position.X < 50) { Position.X = 50; Velocity.X = Math.Abs(Velocity.X); }
+                if (Position.X > 750) { Position.X = 750; Velocity.X = -Math.Abs(Velocity.X); }
+                if (Position.Y < 100) { Position.Y = 100; Velocity.Y = Math.Abs(Velocity.Y); }
+                if (Position.Y > 380) { Position.Y = 380; Velocity.Y = -Math.Abs(Velocity.Y); }
+            }
         }
     }
 }
