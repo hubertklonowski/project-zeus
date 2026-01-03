@@ -68,6 +68,15 @@ namespace ProjectZeus.Core
         // Scene management.
         private bool inZeusFightScene;
         private ZeusFightScene zeusFightScene;
+        private bool inMountainLevel;
+        private MountainLevel mountainLevel;
+
+        // Player inventory for mountain item
+        private bool hasItemFromMountain;
+        
+        // Portal to mountain level
+        private Vector2 portalPosition;
+        private Vector2 portalSize = new Vector2(60, 80);
 
         public PlatformerGame()
         {
@@ -154,6 +163,14 @@ namespace ProjectZeus.Core
             inZeusFightScene = false;
             zeusFightScene = new ZeusFightScene();
             zeusFightScene.LoadContent(GraphicsDevice, hudFont);
+
+            inMountainLevel = false;
+            mountainLevel = new MountainLevel();
+            mountainLevel.LoadContent(GraphicsDevice, hudFont);
+            hasItemFromMountain = false;
+            
+            // Position portal to mountain level on the right side of the screen
+            portalPosition = new Vector2(baseScreenSize.X - 100f, groundTop - portalSize.Y);
         }
 
         public void ScalePresentationArea()
@@ -183,6 +200,13 @@ namespace ProjectZeus.Core
                 return;
             }
 
+            if (inMountainLevel)
+            {
+                UpdateMountainLevel(gameTime);
+                base.Update(gameTime);
+                return;
+            }
+
             //Confirm the screen has not been resized by the user
             if (backbufferHeight != GraphicsDevice.PresentationParameters.BackBufferHeight ||
                 backbufferWidth != GraphicsDevice.PresentationParameters.BackBufferWidth)
@@ -193,6 +217,13 @@ namespace ProjectZeus.Core
             // Handle polling for our input and handling high-level input
             HandleInput(gameTime);
 
+            UpdatePillarRoom(gameTime);
+
+            base.Update(gameTime);
+        }
+
+        private void UpdatePillarRoom(GameTime gameTime)
+        {
             // Simple platformer-style movement.
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             float moveSpeed = 180f;
@@ -257,10 +288,11 @@ namespace ProjectZeus.Core
             if (playerPosition.X + playerSize.X > baseScreenSize.X)
                 playerPosition.X = baseScreenSize.X - playerSize.X;
 
-            // Interaction: press E near a pillar to insert an item (toggle for now).
+            // Interaction: press E near a pillar to insert an item or enter portal.
             if (keyboardState.IsKeyDown(Keys.E))
             {
                 TryInsertItemAtPlayer();
+                TryEnterPortal();
             }
 
             // Check if all items have been inserted; if so, switch to ZeusFightScene.
@@ -288,8 +320,140 @@ namespace ProjectZeus.Core
                     isOnGround = true;
                 }
             }
+        }
 
-            base.Update(gameTime);
+        private void UpdateMountainLevel(GameTime gameTime)
+        {
+            // Handle polling for our input
+            HandleInput(gameTime);
+
+            // Simple platformer-style movement
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            float moveSpeed = 180f;
+            float jumpVelocity = -560f;
+            float gravity = 900f;
+
+            float move = 0f;
+            if (keyboardState.IsKeyDown(Keys.Left) || keyboardState.IsKeyDown(Keys.A))
+                move -= 1f;
+            if (keyboardState.IsKeyDown(Keys.Right) || keyboardState.IsKeyDown(Keys.D))
+                move += 1f;
+
+            playerVelocity.X = move * moveSpeed;
+
+            if (isOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up)))
+            {
+                playerVelocity.Y = jumpVelocity;
+                isOnGround = false;
+            }
+
+            playerVelocity.Y += gravity * dt;
+            playerPosition += playerVelocity * dt;
+
+            // Check platform collision in mountain level
+            Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
+            Vector2 correctedPosition;
+            isOnGround = mountainLevel.CheckPlatformCollision(playerRect, playerVelocity, out correctedPosition);
+
+            if (isOnGround)
+            {
+                playerPosition = correctedPosition;
+                playerVelocity.Y = 0f;
+            }
+
+            // Prevent leaving the screen horizontally
+            if (playerPosition.X < 0)
+                playerPosition.X = 0;
+            if (playerPosition.X + playerSize.X > baseScreenSize.X)
+                playerPosition.X = baseScreenSize.X - playerSize.X;
+
+            // Check if trying to pick up item
+            bool tryPickupItem = keyboardState.IsKeyDown(Keys.E);
+
+            // Update mountain level (goat, rocks, item collection)
+            mountainLevel.Update(gameTime, playerPosition, playerSize, tryPickupItem);
+
+            // Check if player died
+            if (mountainLevel.PlayerDied)
+            {
+                RespawnInPillarRoom();
+            }
+
+            // Check if item was collected
+            if (mountainLevel.ItemWasCollected && !hasItemFromMountain)
+            {
+                hasItemFromMountain = true;
+                // Return to pillar room automatically
+                ReturnToPillarRoom();
+            }
+
+            // Allow player to return to pillar room by going to left edge
+            if (playerPosition.X <= 10f && hasItemFromMountain)
+            {
+                ReturnToPillarRoom();
+            }
+        }
+
+        private void TryEnterPortal()
+        {
+            Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
+            Rectangle portalRect = new Rectangle((int)portalPosition.X, (int)portalPosition.Y, (int)portalSize.X, (int)portalSize.Y);
+
+            if (playerRect.Intersects(portalRect))
+            {
+                EnterMountainLevel();
+            }
+        }
+
+        private void EnterMountainLevel()
+        {
+            inMountainLevel = true;
+            mountainLevel.Reset();
+            
+            // Place player at bottom left of mountain
+            float groundTop = baseScreenSize.Y - 20f;
+            playerPosition = new Vector2(60f, groundTop - playerSize.Y);
+            playerVelocity = Vector2.Zero;
+            isOnGround = true;
+        }
+
+        private void ReturnToPillarRoom()
+        {
+            inMountainLevel = false;
+            
+            // Place player near portal
+            float groundTop = baseScreenSize.Y - 20f;
+            playerPosition = new Vector2(portalPosition.X - 60f, groundTop - playerSize.Y);
+            playerVelocity = Vector2.Zero;
+            isOnGround = true;
+        }
+
+        private void RespawnInPillarRoom()
+        {
+            inMountainLevel = false;
+            
+            // Reset mountain level
+            mountainLevel.Reset();
+            
+            // Clear all inventory items
+            hasItemFromMountain = false;
+            
+            // Reset pillar items
+            if (pillarHasItem != null)
+            {
+                for (int i = 0; i < pillarHasItem.Length; i++)
+                {
+                    pillarHasItem[i] = false;
+                }
+            }
+            
+            // Respawn player at starting position
+            float centerX = baseScreenSize.X / 2f;
+            float spacing = 200f;
+            float groundTop = baseScreenSize.Y - 20f;
+            playerPosition = new Vector2(centerX - spacing - 80f, groundTop - playerSize.Y);
+            playerVelocity = Vector2.Zero;
+            isOnGround = true;
         }
 
         private void TryInsertItemAtPlayer()
@@ -309,8 +473,13 @@ namespace ProjectZeus.Core
 
                 if (playerRect.Intersects(interactionRect))
                 {
-                    pillarHasItem[i] = true; // simple: once inserted, stays there
-                    break;
+                    // Check if player has mountain item to place
+                    if (hasItemFromMountain && !pillarHasItem[i])
+                    {
+                        pillarHasItem[i] = true;
+                        hasItemFromMountain = false;
+                        break;
+                    }
                 }
             }
         }
@@ -321,6 +490,21 @@ namespace ProjectZeus.Core
             {
                 // Let the Zeus fight scene draw its background and the player.
                 zeusFightScene.Draw(spriteBatch, GraphicsDevice, playerTexture, playerPosition, playerSize);
+                base.Draw(gameTime);
+                return;
+            }
+
+            if (inMountainLevel)
+            {
+                // Let the mountain level draw everything
+                mountainLevel.Draw(spriteBatch, GraphicsDevice);
+                
+                // Draw the player on top
+                spriteBatch.Begin();
+                Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
+                spriteBatch.Draw(playerTexture, playerRect, Color.White);
+                spriteBatch.End();
+                
                 base.Draw(gameTime);
                 return;
             }
@@ -458,7 +642,39 @@ namespace ProjectZeus.Core
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
             spriteBatch.Draw(playerTexture, playerRect, Color.White);
 
-            string title = "Insert the three items of Zeus";
+            // Draw portal to mountain level
+            Rectangle portalRect = new Rectangle((int)portalPosition.X, (int)portalPosition.Y, (int)portalSize.X, (int)portalSize.Y);
+            spriteBatch.Draw(pillarTexture, portalRect, new Color(100, 50, 150));
+            DrawRectangleOutline(portalRect, new Color(150, 100, 200));
+            
+            // Draw portal symbol (simple M for Mountain)
+            if (hudFont != null)
+            {
+                string portalLabel = "M";
+                Vector2 portalLabelSize = hudFont.MeasureString(portalLabel);
+                Vector2 portalLabelPos = new Vector2(
+                    portalPosition.X + (portalSize.X - portalLabelSize.X) / 2f,
+                    portalPosition.Y + (portalSize.Y - portalLabelSize.Y) / 2f);
+                spriteBatch.DrawString(hudFont, portalLabel, portalLabelPos, Color.White);
+            }
+
+            // Draw inventory indicator if player has mountain item
+            if (hasItemFromMountain)
+            {
+                Rectangle inventoryRect = new Rectangle(10, 10, 40, 40);
+                spriteBatch.Draw(playerTexture, inventoryRect, Color.Gold);
+                DrawRectangleOutline(inventoryRect, Color.Yellow);
+                
+                if (hudFont != null)
+                {
+                    string inventoryText = "Item collected! Place it in a pillar.";
+                    Vector2 inventoryTextSize = hudFont.MeasureString(inventoryText);
+                    Vector2 inventoryTextPos = new Vector2(60f, 20f);
+                    spriteBatch.DrawString(hudFont, inventoryText, inventoryTextPos, Color.Gold);
+                }
+            }
+
+            string title = hasItemFromMountain ? "Place the item in a pillar slot" : "Enter portal (E) or insert the three items of Zeus";
             Vector2 titleSize = hudFont.MeasureString(title);
             Vector2 titlePos = new Vector2((baseScreenSize.X - titleSize.X) / 2f, 40f);
             spriteBatch.DrawString(hudFont, title, titlePos, Color.Yellow);
