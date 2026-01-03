@@ -40,6 +40,9 @@ namespace Platformer2D
 
         private List<Gem> gems = new List<Gem>();
         private List<Enemy> enemies = new List<Enemy>();
+        private List<Cart> carts = new List<Cart>();
+        private List<Bat> bats = new List<Bat>();
+        private List<PillarItem> pillarItems = new List<PillarItem>();
 
         // Key locations in the level.        
         private Vector2 start;
@@ -220,6 +223,30 @@ namespace Platformer2D
                 case '#':
                     return LoadVarietyTile("BlockA", 7, TileCollision.Impassable);
 
+                // Cart (moves on rails)
+                case 'R':
+                    return LoadCartTile(x, y);
+
+                // Bat (flying enemy)
+                case 'F':
+                    return LoadBatTile(x, y);
+
+                // Pillar Item (collectible for pillar)
+                case 'I':
+                    return LoadPillarItemTile(x, y);
+
+                // Stalactite (decorative, hanging from ceiling)
+                case 'V':
+                    return LoadStalactiteTile();
+
+                // Torch (decorative)
+                case 'T':
+                    return LoadTorchTile();
+
+                // Rail (passable, decorative track)
+                case '=':
+                    return LoadRailTile();
+
                 // Unknown tile type character
                 default:
                     throw new NotSupportedException(String.Format("Unsupported tile type character '{0}' at position {1}, {2}.", tileType, x, y));
@@ -307,6 +334,217 @@ namespace Platformer2D
             gems.Add(new Gem(this, new Vector2(position.X, position.Y)));
 
             return new Tile(null, TileCollision.Passable);
+        }
+
+        /// <summary>
+        /// Instantiates a cart and puts it in the level.
+        /// </summary>
+        private Tile LoadCartTile(int x, int y)
+        {
+            Vector2 position = RectangleExtensions.GetBottomCenter(GetBounds(x, y));
+            carts.Add(new Cart(this, position));
+
+            return new Tile(null, TileCollision.Passable);
+        }
+
+        /// <summary>
+        /// Instantiates a bat and puts it in the level.
+        /// </summary>
+        private Tile LoadBatTile(int x, int y)
+        {
+            Point position = GetBounds(x, y).Center;
+            bats.Add(new Bat(this, new Vector2(position.X, position.Y)));
+
+            return new Tile(null, TileCollision.Passable);
+        }
+
+        /// <summary>
+        /// Instantiates a pillar item and puts it in the level.
+        /// </summary>
+        private Tile LoadPillarItemTile(int x, int y)
+        {
+            Point position = GetBounds(x, y).Center;
+            // Create item with a distinct color (gold for first item)
+            Color itemColor = Color.Gold;
+            pillarItems.Add(new PillarItem(this, new Vector2(position.X, position.Y), itemColor));
+
+            return new Tile(null, TileCollision.Passable);
+        }
+
+        /// <summary>
+        /// Loads a stalactite tile (decorative hanging spike).
+        /// </summary>
+        private Tile LoadStalactiteTile()
+        {
+            // Create a simple placeholder texture for stalactite
+            Texture2D stalactiteTexture = CreateStalactiteTexture();
+            return new Tile(stalactiteTexture, TileCollision.Passable);
+        }
+
+        /// <summary>
+        /// Loads a torch tile (decorative light source).
+        /// </summary>
+        private Tile LoadTorchTile()
+        {
+            // Create a simple placeholder texture for torch
+            Texture2D torchTexture = CreateTorchTexture();
+            return new Tile(torchTexture, TileCollision.Passable);
+        }
+
+        /// <summary>
+        /// Loads a rail tile (decorative track for carts).
+        /// </summary>
+        private Tile LoadRailTile()
+        {
+            // Create a simple placeholder texture for rails
+            Texture2D railTexture = CreateRailTexture();
+            return new Tile(railTexture, TileCollision.Passable);
+        }
+
+        /// <summary>
+        /// Helper method to get the graphics device.
+        /// </summary>
+        private GraphicsDevice GetGraphicsDevice()
+        {
+            return (Content.ServiceProvider.GetService(typeof(IGraphicsDeviceService)) as IGraphicsDeviceService)?.GraphicsDevice;
+        }
+
+        /// <summary>
+        /// Creates a placeholder texture for a stalactite.
+        /// </summary>
+        private Texture2D CreateStalactiteTexture()
+        {
+            var graphicsDevice = GetGraphicsDevice();
+            if (graphicsDevice == null) return null;
+
+            Texture2D texture = new Texture2D(graphicsDevice, Tile.Width, Tile.Height);
+            Color[] data = new Color[Tile.Width * Tile.Height];
+            
+            // Fill with transparent background
+            for (int i = 0; i < data.Length; i++)
+                data[i] = Color.Transparent;
+
+            // Draw a simple stalactite shape (triangle pointing down)
+            int centerX = Tile.Width / 2;
+            for (int y = 0; y < Tile.Height / 2; y++)
+            {
+                int width = (Tile.Width / 4) - (y * Tile.Width / (Tile.Height * 2));
+                for (int x = centerX - width; x <= centerX + width; x++)
+                {
+                    if (x >= 0 && x < Tile.Width)
+                    {
+                        int index = y * Tile.Width + x;
+                        data[index] = new Color(150, 150, 150); // Gray stone
+                    }
+                }
+            }
+
+            texture.SetData(data);
+            return texture;
+        }
+
+        /// <summary>
+        /// Creates a placeholder texture for a torch.
+        /// </summary>
+        private Texture2D CreateTorchTexture()
+        {
+            var graphicsDevice = GetGraphicsDevice();
+            if (graphicsDevice == null) return null;
+
+            Texture2D texture = new Texture2D(graphicsDevice, Tile.Width, Tile.Height);
+            Color[] data = new Color[Tile.Width * Tile.Height];
+            
+            // Fill with transparent background
+            for (int i = 0; i < data.Length; i++)
+                data[i] = Color.Transparent;
+
+            // Draw a simple torch (stick with flame on top)
+            int centerX = Tile.Width / 2;
+            
+            // Stick (brown)
+            for (int y = Tile.Height / 3; y < Tile.Height; y++)
+            {
+                for (int x = centerX - 2; x <= centerX + 2; x++)
+                {
+                    if (x >= 0 && x < Tile.Width)
+                    {
+                        int index = y * Tile.Width + x;
+                        data[index] = new Color(101, 67, 33);
+                    }
+                }
+            }
+
+            // Flame (yellow/orange)
+            for (int y = Tile.Height / 6; y < Tile.Height / 3; y++)
+            {
+                int flameWidth = 4 - (y * 2 / Tile.Height);
+                for (int x = centerX - flameWidth; x <= centerX + flameWidth; x++)
+                {
+                    if (x >= 0 && x < Tile.Width)
+                    {
+                        int index = y * Tile.Width + x;
+                        data[index] = new Color(255, 200, 50);
+                    }
+                }
+            }
+
+            texture.SetData(data);
+            return texture;
+        }
+
+        /// <summary>
+        /// Creates a placeholder texture for rails.
+        /// </summary>
+        private Texture2D CreateRailTexture()
+        {
+            var graphicsDevice = GetGraphicsDevice();
+            if (graphicsDevice == null) return null;
+
+            Texture2D texture = new Texture2D(graphicsDevice, Tile.Width, Tile.Height);
+            Color[] data = new Color[Tile.Width * Tile.Height];
+            
+            // Fill with transparent background
+            for (int i = 0; i < data.Length; i++)
+                data[i] = Color.Transparent;
+
+            // Draw horizontal rails
+            int rail1Y = Tile.Height / 2 - 3;
+            int rail2Y = Tile.Height / 2 + 3;
+            
+            for (int x = 0; x < Tile.Width; x++)
+            {
+                // Upper rail
+                for (int y = rail1Y; y < rail1Y + 2; y++)
+                {
+                    int index = y * Tile.Width + x;
+                    data[index] = new Color(120, 120, 120);
+                }
+                // Lower rail
+                for (int y = rail2Y; y < rail2Y + 2; y++)
+                {
+                    int index = y * Tile.Width + x;
+                    data[index] = new Color(120, 120, 120);
+                }
+            }
+
+            // Draw wooden ties
+            for (int tieX = 0; tieX < Tile.Width; tieX += Tile.Width / 3)
+            {
+                for (int x = tieX; x < tieX + 4 && x < Tile.Width; x++)
+                {
+                    for (int y = rail1Y - 2; y < rail2Y + 4; y++)
+                    {
+                        if (y >= 0 && y < Tile.Height)
+                        {
+                            int index = y * Tile.Width + x;
+                            data[index] = new Color(101, 67, 33);
+                        }
+                    }
+                }
+            }
+
+            texture.SetData(data);
+            return texture;
         }
 
         /// <summary>
@@ -404,6 +642,11 @@ namespace Platformer2D
 
                 UpdateEnemies(gameTime);
 
+                // Update carts, bats, and pillar items
+                UpdateCarts(gameTime);
+                UpdateBats(gameTime);
+                UpdatePillarItems(gameTime);
+
                 // The player has reached the exit if they are standing on the ground and
                 // his bounding rectangle contains the center of the exit tile. They can only
                 // exit when they have collected all of the gems.
@@ -457,6 +700,48 @@ namespace Platformer2D
         }
 
         /// <summary>
+        /// Updates each cart.
+        /// </summary>
+        private void UpdateCarts(GameTime gameTime)
+        {
+            foreach (Cart cart in carts)
+            {
+                cart.Update(gameTime);
+            }
+        }
+
+        /// <summary>
+        /// Updates each bat.
+        /// </summary>
+        private void UpdateBats(GameTime gameTime)
+        {
+            foreach (Bat bat in bats)
+            {
+                bat.Update(gameTime);
+            }
+        }
+
+        /// <summary>
+        /// Animates each pillar item and checks if the player can collect them.
+        /// </summary>
+        private void UpdatePillarItems(GameTime gameTime)
+        {
+            for (int i = 0; i < pillarItems.Count; ++i)
+            {
+                PillarItem item = pillarItems[i];
+
+                item.Update(gameTime);
+
+                // Check if player is near and not already collected
+                if (!item.IsCollected && item.BoundingCircle.Intersects(Player.BoundingRectangle))
+                {
+                    // Note: We don't automatically collect the item - player needs to press E
+                    // This will be handled in Player.cs or a separate interaction system
+                }
+            }
+        }
+
+        /// <summary>
         /// Called when a gem is collected.
         /// </summary>
         /// <param name="gem">The gem that was collected.</param>
@@ -498,6 +783,23 @@ namespace Platformer2D
             Player.Reset(start);
         }
 
+        /// <summary>
+        /// Tries to collect a pillar item near the player if E is pressed.
+        /// </summary>
+        public PillarItem TryCollectPillarItem(Rectangle playerBounds)
+        {
+            for (int i = 0; i < pillarItems.Count; ++i)
+            {
+                PillarItem item = pillarItems[i];
+                if (!item.IsCollected && item.BoundingCircle.Intersects(playerBounds))
+                {
+                    item.OnCollected(Player);
+                    return item;
+                }
+            }
+            return null;
+        }
+
         #endregion
 
         #region Draw
@@ -515,10 +817,19 @@ namespace Platformer2D
             foreach (Gem gem in gems)
                 gem.Draw(gameTime, spriteBatch);
 
+            foreach (PillarItem item in pillarItems)
+                item.Draw(gameTime, spriteBatch);
+
+            foreach (Cart cart in carts)
+                cart.Draw(gameTime, spriteBatch);
+
             Player.Draw(gameTime, spriteBatch);
 
             foreach (Enemy enemy in enemies)
                 enemy.Draw(gameTime, spriteBatch);
+
+            foreach (Bat bat in bats)
+                bat.Draw(gameTime, spriteBatch);
 
             for (int i = EntityLayer + 1; i < layers.Length; ++i)
                 spriteBatch.Draw(layers[i], Vector2.Zero, Color.White);
