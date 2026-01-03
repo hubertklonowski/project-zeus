@@ -76,7 +76,7 @@ namespace ProjectZeus.Core
         private bool inZeusFightScene;
         private ZeusFightScene zeusFightScene;
         private bool inMineLevel;
-        private Platformer2D.PillarItem mineLevelItem;
+        private bool hasCollectedMineItem;  // Simple flag instead of PillarItem
         
         // Mine level simple scene (no Level.cs, using simple shapes)
         private Vector2 minePlayerPosition;
@@ -211,7 +211,7 @@ namespace ProjectZeus.Core
             zeusFightScene.LoadContent(GraphicsDevice, hudFont);
 
             inMineLevel = false;
-            mineLevelItem = null;
+            hasCollectedMineItem = false;
             // Mine level will use simple shapes, no text file needed
         }
 
@@ -345,7 +345,7 @@ namespace ProjectZeus.Core
             }
 
             // Interaction: press E near a pillar to insert an item (if we have one).
-            if (keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E) && mineLevelItem != null)
+            if (keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E) && hasCollectedMineItem)
             {
                 TryInsertItemAtPlayer();
             }
@@ -402,7 +402,7 @@ namespace ProjectZeus.Core
                 if (playerRect.Intersects(interactionRect))
                 {
                     pillarHasItem[i] = true; // Insert the item
-                    mineLevelItem = null; // Item has been placed
+                    hasCollectedMineItem = false; // Item has been placed
                     break;
                 }
             }
@@ -471,8 +471,7 @@ namespace ProjectZeus.Core
                 if (playerRect.Intersects(mineItemRect))
                 {
                     mineItemCollected = true;
-                    // Create a simple pillar item (we don't need the full PillarItem class)
-                    mineLevelItem = new Platformer2D.PillarItem(null, Vector2.Zero, Color.Gold);
+                    hasCollectedMineItem = true; // Mark that we have the item for pillar placement
                 }
             }
 
@@ -755,7 +754,7 @@ namespace ProjectZeus.Core
             Vector2 instrPos = new Vector2((baseScreenSize.X - instrSize.X) / 2f, 70f);
             spriteBatch.DrawString(hudFont, instructions, instrPos, new Color(255, 100, 255));
 
-            if (mineLevelItem != null)
+            if (hasCollectedMineItem)
             {
                 string hasItem = "Press E near a pillar to place the item";
                 Vector2 hasItemSize = hudFont.MeasureString(hasItem);
