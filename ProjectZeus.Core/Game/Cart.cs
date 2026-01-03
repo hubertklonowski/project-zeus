@@ -128,7 +128,7 @@ namespace Platformer2D
                 int groundY = posY + 1;
 
                 // If we're approaching an edge or wall, stop and wait
-                if (nextPosX >= 0 && nextPosX < level.Width && groundY < level.Height)
+                if (nextPosX >= 0 && nextPosX < level.Width && groundY >= 0 && groundY < level.Height)
                 {
                     TileCollision nextGround = level.GetCollision(nextPosX, groundY);
                     TileCollision nextAhead = level.GetCollision(nextPosX, posY);

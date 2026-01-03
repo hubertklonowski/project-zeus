@@ -402,11 +402,19 @@ namespace Platformer2D
         }
 
         /// <summary>
+        /// Helper method to get the graphics device.
+        /// </summary>
+        private GraphicsDevice GetGraphicsDevice()
+        {
+            return (Content.ServiceProvider.GetService(typeof(IGraphicsDeviceService)) as IGraphicsDeviceService)?.GraphicsDevice;
+        }
+
+        /// <summary>
         /// Creates a placeholder texture for a stalactite.
         /// </summary>
         private Texture2D CreateStalactiteTexture()
         {
-            var graphicsDevice = (Content.ServiceProvider.GetService(typeof(IGraphicsDeviceService)) as IGraphicsDeviceService)?.GraphicsDevice;
+            var graphicsDevice = GetGraphicsDevice();
             if (graphicsDevice == null) return null;
 
             Texture2D texture = new Texture2D(graphicsDevice, Tile.Width, Tile.Height);
@@ -440,7 +448,7 @@ namespace Platformer2D
         /// </summary>
         private Texture2D CreateTorchTexture()
         {
-            var graphicsDevice = (Content.ServiceProvider.GetService(typeof(IGraphicsDeviceService)) as IGraphicsDeviceService)?.GraphicsDevice;
+            var graphicsDevice = GetGraphicsDevice();
             if (graphicsDevice == null) return null;
 
             Texture2D texture = new Texture2D(graphicsDevice, Tile.Width, Tile.Height);
@@ -489,7 +497,7 @@ namespace Platformer2D
         /// </summary>
         private Texture2D CreateRailTexture()
         {
-            var graphicsDevice = (Content.ServiceProvider.GetService(typeof(IGraphicsDeviceService)) as IGraphicsDeviceService)?.GraphicsDevice;
+            var graphicsDevice = GetGraphicsDevice();
             if (graphicsDevice == null) return null;
 
             Texture2D texture = new Texture2D(graphicsDevice, Tile.Width, Tile.Height);

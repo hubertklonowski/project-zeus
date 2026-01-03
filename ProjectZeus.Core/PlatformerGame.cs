@@ -332,7 +332,8 @@ namespace ProjectZeus.Core
 
         private void TryInsertItemAtPlayer()
         {
-            if (pillars == null || pillarHasItem == null || collectedItem == null)
+            // Caller ensures collectedItem is not null
+            if (pillars == null || pillarHasItem == null)
                 return;
 
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);

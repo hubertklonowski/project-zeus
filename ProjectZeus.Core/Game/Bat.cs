@@ -17,6 +17,9 @@ namespace Platformer2D
     /// </summary>
     class Bat
     {
+        private static Random sharedRandom = new Random();
+        private static int instanceCounter = 0;
+
         public Level Level
         {
             get { return level; }
@@ -69,7 +72,8 @@ namespace Platformer2D
             this.level = level;
             this.position = position;
             this.startPosition = position;
-            this.random = new Random((int)position.X + (int)position.Y);
+            // Use a combination of shared random, instance counter, and position for better variation
+            this.random = new Random(sharedRandom.Next() + (instanceCounter++) * 1000 + (int)position.X + (int)position.Y);
 
             LoadContent();
         }
