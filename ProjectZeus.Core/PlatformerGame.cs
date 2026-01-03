@@ -188,9 +188,6 @@ namespace ProjectZeus.Core
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         protected override void Update(GameTime gameTime)
         {
-            // Handle polling for our input
-            keyboardState = Keyboard.GetState();
-            
             if (inZeusFightScene)
             {
                 zeusFightScene.Update(gameTime);
@@ -200,6 +197,8 @@ namespace ProjectZeus.Core
             
             if (inMazeLevel)
             {
+                // Handle polling for maze input separately
+                keyboardState = Keyboard.GetState();
                 mazeLevel.Update(gameTime, keyboardState);
                 
                 // Check if player completed the maze

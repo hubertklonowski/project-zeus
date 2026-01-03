@@ -44,6 +44,11 @@ namespace ProjectZeus.Core
         // Visibility
         private const int visibilityRadius = 4; // cells visible around player
         
+        // Configuration constants
+        private const float minItemDistanceFromPlayer = 300f;
+        private const float minMinotaurSpawnDistance = 150f;
+        private const double minotaurDirectionChangeChance = 0.02; // 2% chance per frame
+        
         public bool IsCompleted { get; private set; }
         public bool HasItem { get; private set; }
         
@@ -139,9 +144,10 @@ namespace ProjectZeus.Core
         private void PlacePlayerAndItem()
         {
             // Place player at top-left passage
-            for (int y = 1; y < mazeHeight - 1; y++)
+            bool playerPlaced = false;
+            for (int y = 1; y < mazeHeight - 1 && !playerPlaced; y++)
             {
-                for (int x = 1; x < mazeWidth - 1; x++)
+                for (int x = 1; x < mazeWidth - 1 && !playerPlaced; x++)
                 {
                     if (!walls[x, y])
                     {
@@ -150,11 +156,10 @@ namespace ProjectZeus.Core
                         playerVelocity = Vector2.Zero;
                         entrancePosition = new Vector2(x * cellSize + cellSize / 2,
                                                       y * cellSize + cellSize / 2);
-                        goto PlayerPlaced;
+                        playerPlaced = true;
                     }
                 }
             }
-            PlayerPlaced:
             
             // Place item far from player
             int attempts = 0;
@@ -170,7 +175,7 @@ namespace ProjectZeus.Core
                     float distance = Vector2.Distance(playerPosition, itemPos);
                     
                     // Make sure item is reasonably far from player
-                    if (distance > 300)
+                    if (distance > minItemDistanceFromPlayer)
                     {
                         itemPosition = itemPos;
                         break;
@@ -302,7 +307,7 @@ namespace ProjectZeus.Core
                                                    y * cellSize + cellSize / 2 - minotaurSize.Y / 2);
                     float distance = Vector2.Distance(playerPosition, spawnPos);
                     
-                    if (distance > 150) // Don't spawn too close to player
+                    if (distance > minMinotaurSpawnDistance) // Don't spawn too close to player
                     {
                         minotaurPosition = spawnPos;
                         // Random initial direction
@@ -331,7 +336,7 @@ namespace ProjectZeus.Core
                 minotaurPosition = newPos;
                 
                 // Occasionally change direction randomly
-                if (random.NextDouble() < 0.02) // 2% chance per frame
+                if (random.NextDouble() < minotaurDirectionChangeChance)
                 {
                     float angle = (float)(random.NextDouble() * Math.PI * 2);
                     minotaurVelocity = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * 80f;
