@@ -7,7 +7,7 @@ A new mine level has been added to Project Zeus where players can explore a cave
 
 1. **Pillar Room** (Main Scene)
    - Start in the pillar room with three pillars
-   - Press **M** to enter the Mine Level
+   - Walk into the **portal** on the right side to enter the Mine Level
    - Goal: Collect items from the mine and place them on the three pillars
 
 2. **Mine Level** (Level 3)
@@ -31,7 +31,7 @@ A new mine level has been added to Project Zeus where players can explore a cave
    - Once placed, the item cannot be removed
 
 4. **Complete All Pillars**
-   - Enter the mine level multiple times if needed (press **M** again)
+   - Enter the mine level multiple times if needed (walk into the portal again)
    - Collect and place items on all three pillars
    - When all three pillars have items, the Zeus Fight Scene begins
 

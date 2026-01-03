@@ -66,6 +66,11 @@ namespace ProjectZeus.Core
         private bool[] pillarHasItem;
         private Color[] pillarItemColors;
 
+        // Portal to mine level
+        private Texture2D portalTexture;
+        private Rectangle portalRect;
+        private float portalAnimationTime;
+
         // Scene management.
         private bool inZeusFightScene;
         private ZeusFightScene zeusFightScene;
@@ -154,6 +159,15 @@ namespace ProjectZeus.Core
             playerPosition = new Vector2(centerX - spacing - 80f, groundTop - playerSize.Y);
             playerVelocity = Vector2.Zero;
             isOnGround = true;
+
+            // Create portal to mine level (on the right side of the screen)
+            portalTexture = CreateSolidTexture(GraphicsDevice, 1, 1, Color.White);
+            float portalWidth = 60f;
+            float portalHeight = 80f;
+            float portalX = baseScreenSize.X - portalWidth - 100f;
+            float portalY = groundTop - portalHeight;
+            portalRect = new Rectangle((int)portalX, (int)portalY, (int)portalWidth, (int)portalHeight);
+            portalAnimationTime = 0f;
 
             inZeusFightScene = false;
             zeusFightScene = new ZeusFightScene();
@@ -288,7 +302,18 @@ namespace ProjectZeus.Core
             if (playerPosition.X + playerSize.X > baseScreenSize.X)
                 playerPosition.X = baseScreenSize.X - playerSize.X;
 
-            // Press M to enter the mine level
+            // Update portal animation
+            portalAnimationTime += (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+            // Check if player enters the portal to the mine level
+            Rectangle playerRect2 = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
+            if (playerRect2.Intersects(portalRect) && !inMineLevel)
+            {
+                LoadMineLevel();
+                return; // Exit this update, next frame will use mine level update
+            }
+
+            // Press M to enter the mine level (keep as backup option)
             if (keyboardState.IsKeyDown(Keys.M) && !previousKeyboardState.IsKeyDown(Keys.M) && !inMineLevel)
             {
                 LoadMineLevel();
@@ -572,6 +597,32 @@ namespace ProjectZeus.Core
                 }
             }
 
+            // Draw the portal with animation
+            if (portalTexture != null)
+            {
+                // Animated portal effect - pulsing colors
+                float pulse = (float)Math.Sin(portalAnimationTime * 3.0f) * 0.3f + 0.7f;
+                Color portalColor1 = new Color((byte)(100 * pulse), (byte)(50 * pulse), (byte)(200 * pulse));
+                Color portalColor2 = new Color((byte)(150 * pulse), (byte)(100 * pulse), (byte)(255 * pulse));
+
+                // Draw portal frame
+                spriteBatch.Draw(portalTexture, portalRect, portalColor1);
+                
+                // Draw inner portal with different color
+                Rectangle innerPortal = portalRect;
+                innerPortal.Inflate(-8, -8);
+                spriteBatch.Draw(portalTexture, innerPortal, portalColor2);
+
+                // Draw portal outline
+                DrawRectangleOutline(portalRect, Color.Purple);
+
+                // Draw "MINE" text above portal
+                string portalLabel = "MINE";
+                Vector2 portalLabelSize = hudFont.MeasureString(portalLabel);
+                Vector2 portalLabelPos = new Vector2(portalRect.X + (portalRect.Width - portalLabelSize.X) / 2f, portalRect.Y - portalLabelSize.Y - 5f);
+                spriteBatch.DrawString(hudFont, portalLabel, portalLabelPos, Color.White);
+            }
+
             // Draw the player.
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
             spriteBatch.Draw(playerTexture, playerRect, Color.White);
@@ -581,7 +632,7 @@ namespace ProjectZeus.Core
             Vector2 titlePos = new Vector2((baseScreenSize.X - titleSize.X) / 2f, 40f);
             spriteBatch.DrawString(hudFont, title, titlePos, Color.Yellow);
 
-            string instructions = "Press M to enter the Mine Level";
+            string instructions = "Enter the portal to go to the Mine Level";
             Vector2 instrSize = hudFont.MeasureString(instructions);
             Vector2 instrPos = new Vector2((baseScreenSize.X - instrSize.X) / 2f, 70f);
             spriteBatch.DrawString(hudFont, instructions, instrPos, Color.White);
