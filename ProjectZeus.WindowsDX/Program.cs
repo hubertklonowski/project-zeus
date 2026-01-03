@@ -1,5 +1,4 @@
-﻿
-using Platformer2D;
+﻿using ProjectZeus.Core;
 
 using var game = new PlatformerGame();
 game.Run();

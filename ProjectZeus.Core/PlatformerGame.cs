@@ -15,8 +15,9 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Input.Touch;
 using Microsoft.Xna.Framework.Media;
+using Platformer2D;
 
-namespace Platformer2D
+namespace ProjectZeus.Core
 {
     /// <summary>
     /// This is the main type for your game
@@ -37,28 +38,36 @@ namespace Platformer2D
         private Texture2D loseOverlay;
         private Texture2D diedOverlay;
 
-        // Meta-level game state.
-        private int levelIndex = -1;
-        private Level level;
+        // Meta-level game state (level removed for now, single-scene only).
         private bool wasContinuePressed;
 
-        // When the time remaining is less than the warning time, it blinks on the hud
-        private static readonly TimeSpan WarningTime = TimeSpan.FromSeconds(30);
-
-        // We store our input states so that we only poll once per frame, 
-        // then we use the same input state wherever needed
+        // We store our input states so that we only poll once per frame.
         private GamePadState gamePadState;
         private KeyboardState keyboardState;
         private TouchCollection touchState;
-        private AccelerometerState accelerometerState;
 
         private VirtualGamePad virtualGamePad;
 
-        // The number of levels in the Levels directory of our content. We assume that
-        // levels in our content are 0-based and that all numbers under this constant
-        // have a level file present. This allows us to not need to check for the file
-        // or handle exceptions, both of which can add unnecessary time to level loading.
-        private const int numberOfLevels = 3;
+        // Main scene content (three pillars with empty item slots).
+        private Texture2D pillarTexture;
+        private Texture2D slotTexture;
+        private Texture2D skyTexture;
+        private Pillar[] pillars;
+
+        // Simple player.
+        private Texture2D playerTexture;
+        private Vector2 playerPosition;
+        private Vector2 playerVelocity;
+        private readonly Vector2 playerSize = new Vector2(32, 48);
+        private bool isOnGround;
+
+        // Simple pillar item state.
+        private bool[] pillarHasItem;
+        private Color[] pillarItemColors;
+
+        // Scene management.
+        private bool inZeusFightScene;
+        private ZeusFightScene zeusFightScene;
 
         public PlatformerGame()
         {
@@ -68,12 +77,9 @@ namespace Platformer2D
             TargetElapsedTime = TimeSpan.FromTicks(333333);
 #endif
             graphics.IsFullScreen = false;
-
-            //graphics.PreferredBackBufferWidth = 800;
-            //graphics.PreferredBackBufferHeight = 480;
             graphics.SupportedOrientations = DisplayOrientation.LandscapeLeft | DisplayOrientation.LandscapeRight;
 
-            Accelerometer.Initialize();
+            IsMouseVisible = true;
         }
 
         /// <summary>
@@ -101,7 +107,7 @@ namespace Platformer2D
 
             if (!OperatingSystem.IsIOS())
             {
-                //Known issue that you get exceptions if you use Media PLayer while connected to your PC
+                //Known issue that you get exceptions if you use Media Player while connected to your PC
                 //See http://social.msdn.microsoft.com/Forums/en/windowsphone7series/thread/c8a243d2-d360-46b1-96bd-62b1ef268c66
                 //Which means its impossible to test this from VS.
                 //So we have to catch the exception and throw it away
@@ -113,7 +119,41 @@ namespace Platformer2D
                 catch { }
             }
 
-            LoadNextLevel();
+            // Create simple textures for pillars, sky and empty item slots.
+            pillarTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(230, 230, 230));
+            slotTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(200, 200, 255));
+            skyTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(135, 206, 235));
+            playerTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(255, 220, 180));
+
+            // Set up three pillars across the base screen, starting from the bottom.
+            float centerX = baseScreenSize.X / 2f;
+            float groundY = baseScreenSize.Y; // pillars go from bottom up
+            float spacing = 200f;
+
+            // Make pillars shorter so the player can reach the top.
+            Vector2 pillarSize = new Vector2(60f, 140f);
+            Vector2 slotSize = new Vector2(80f, 60f);
+            float slotOffsetY = 10f;
+
+            pillars = new[]
+            {
+                new Pillar { Position = new Vector2(centerX - spacing, groundY), Size = pillarSize, SlotSize = slotSize, SlotOffsetY = slotOffsetY },
+                new Pillar { Position = new Vector2(centerX,          groundY), Size = pillarSize, SlotSize = slotSize, SlotOffsetY = slotOffsetY },
+                new Pillar { Position = new Vector2(centerX + spacing, groundY), Size = pillarSize, SlotSize = slotSize, SlotOffsetY = slotOffsetY }
+            };
+
+            pillarHasItem = new bool[pillars.Length];
+            pillarItemColors = new[] { Color.Gold, Color.DeepSkyBlue, Color.MediumVioletRed };
+
+            // Place player on the ground near the left pillar.
+            float groundTop = baseScreenSize.Y - 20f;
+            playerPosition = new Vector2(centerX - spacing - 80f, groundTop - playerSize.Y);
+            playerVelocity = Vector2.Zero;
+            isOnGround = true;
+
+            inZeusFightScene = false;
+            zeusFightScene = new ZeusFightScene();
+            zeusFightScene.LoadContent(GraphicsDevice, hudFont);
         }
 
         public void ScalePresentationArea()
@@ -126,9 +166,9 @@ namespace Platformer2D
             Vector3 screenScalingFactor = new Vector3(horScaling, verScaling, 1);
             globalTransformation = Matrix.CreateScale(screenScalingFactor);
             System.Diagnostics.Debug.WriteLine("Screen Size - Width[" + GraphicsDevice.PresentationParameters.BackBufferWidth + "] Height [" + GraphicsDevice.PresentationParameters.BackBufferHeight + "]");
+
         }
 
-        
         /// <summary>
         /// Allows the game to run logic such as updating the world,
         /// checking for collisions, gathering input, and playing audio.
@@ -136,23 +176,164 @@ namespace Platformer2D
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         protected override void Update(GameTime gameTime)
         {
+            if (inZeusFightScene)
+            {
+                zeusFightScene.Update(gameTime);
+                base.Update(gameTime);
+                return;
+            }
+
             //Confirm the screen has not been resized by the user
             if (backbufferHeight != GraphicsDevice.PresentationParameters.BackBufferHeight ||
                 backbufferWidth != GraphicsDevice.PresentationParameters.BackBufferWidth)
             {
                 ScalePresentationArea();
             }
+
             // Handle polling for our input and handling high-level input
             HandleInput(gameTime);
 
-            // update our level, passing down the GameTime along with all of our input states
-            level.Update(gameTime, keyboardState, gamePadState, 
-                         accelerometerState, Window.CurrentOrientation);
+            // Simple platformer-style movement.
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            float moveSpeed = 180f;
+            float jumpVelocity = -560f;
+            float gravity = 900f;
 
-            if (level.Player.Velocity != Vector2.Zero)
-                virtualGamePad.NotifyPlayerIsMoving();
+            float move = 0f;
+            if (keyboardState.IsKeyDown(Keys.Left) || keyboardState.IsKeyDown(Keys.A))
+                move -= 1f;
+            if (keyboardState.IsKeyDown(Keys.Right) || keyboardState.IsKeyDown(Keys.D))
+                move += 1f;
+
+            playerVelocity.X = move * moveSpeed;
+
+            if (isOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up)))
+            {
+                playerVelocity.Y = jumpVelocity;
+                isOnGround = false;
+            }
+
+            playerVelocity.Y += gravity * dt;
+            playerPosition += playerVelocity * dt;
+
+            float groundTop = baseScreenSize.Y - 20f;
+            isOnGround = false;
+
+            // Ground collision
+            if (playerPosition.Y + playerSize.Y >= groundTop)
+            {
+                playerPosition.Y = groundTop - playerSize.Y;
+                playerVelocity.Y = 0f;
+                isOnGround = true;
+            }
+
+            // Pillar top collision (simple AABB against top surfaces).
+            if (pillars != null)
+            {
+                Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
+                foreach (Pillar pillar in pillars)
+                {
+                    Rectangle pillarRect = pillar.GetPillarRectangle();
+
+                    Rectangle topRect = new Rectangle(pillarRect.X, pillarRect.Y - 2, pillarRect.Width, 6);
+
+                    if (playerRect.Bottom > topRect.Top &&
+                        playerRect.Bottom <= topRect.Top + 20 &&
+                        playerRect.Right > topRect.Left &&
+                        playerRect.Left < topRect.Right &&
+                        playerVelocity.Y >= 0)
+                    {
+                        playerPosition.Y = topRect.Top - playerSize.Y;
+                        playerVelocity.Y = 0f;
+                        isOnGround = true;
+                        playerRect.Y = (int)playerPosition.Y;
+                    }
+                }
+            }
+
+            // Prevent leaving the screen horizontally.
+            if (playerPosition.X < 0)
+                playerPosition.X = 0;
+            if (playerPosition.X + playerSize.X > baseScreenSize.X)
+                playerPosition.X = baseScreenSize.X - playerSize.X;
+
+            // Interaction: press E near a pillar to insert an item (toggle for now).
+            if (keyboardState.IsKeyDown(Keys.E))
+            {
+                TryInsertItemAtPlayer();
+            }
+
+            // Check if all items have been inserted; if so, switch to ZeusFightScene.
+            if (pillarHasItem != null)
+            {
+                bool allInserted = true;
+                for (int i = 0; i < pillarHasItem.Length; i++)
+                {
+                    if (!pillarHasItem[i])
+                    {
+                        allInserted = false;
+                        break;
+                    }
+                }
+
+                if (allInserted)
+                {
+                    inZeusFightScene = true;
+
+                    // When we enter the fight scene, move the player to the right side
+                    // of the screen so they start opposite Zeus.
+                    float fightGroundTop = baseScreenSize.Y * 0.7f; // match ZeusFightScene ground band
+                    playerPosition = new Vector2(baseScreenSize.X - playerSize.X - 40f, fightGroundTop - playerSize.Y);
+                    playerVelocity = Vector2.Zero;
+                    isOnGround = true;
+                }
+            }
 
             base.Update(gameTime);
+        }
+
+        private void TryInsertItemAtPlayer()
+        {
+            if (pillars == null || pillarHasItem == null)
+                return;
+
+            Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
+
+            for (int i = 0; i < pillars.Length; i++)
+            {
+                Rectangle slotRect = pillars[i].GetSlotRectangle();
+
+                // Define a small interaction zone around the slot.
+                Rectangle interactionRect = slotRect;
+                interactionRect.Inflate(20, 20);
+
+                if (playerRect.Intersects(interactionRect))
+                {
+                    pillarHasItem[i] = true; // simple: once inserted, stays there
+                    break;
+                }
+            }
+        }
+
+        protected override void Draw(GameTime gameTime)
+        {
+            if (inZeusFightScene)
+            {
+                // Let the Zeus fight scene draw its background and the player.
+                zeusFightScene.Draw(spriteBatch, GraphicsDevice, playerTexture, playerPosition, playerSize);
+                base.Draw(gameTime);
+                return;
+            }
+
+            graphics.GraphicsDevice.Clear(Color.CornflowerBlue);
+
+            spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, globalTransformation);
+
+            DrawMainScene(gameTime);
+
+            spriteBatch.End();
+
+            base.Draw(gameTime);
         }
 
         private void HandleInput(GameTime gameTime)
@@ -161,7 +342,6 @@ namespace Platformer2D
             keyboardState = Keyboard.GetState();
             touchState = TouchPanel.GetState();
             gamePadState = virtualGamePad.GetState(touchState, GamePad.GetState(PlayerIndex.One));
-            accelerometerState = Accelerometer.GetState();
 
             if (!OperatingSystem.IsIOS())
             {
@@ -170,135 +350,129 @@ namespace Platformer2D
                     Exit();
             }
 
-            bool continuePressed =
-                keyboardState.IsKeyDown(Keys.Space) ||
-                gamePadState.IsButtonDown(Buttons.A) ||
-                touchState.AnyTouch();
-
-            // Perform the appropriate action to advance the game and
-            // to get the player back to playing.
-            if (!wasContinuePressed && continuePressed)
-            {
-                if (!level.Player.IsAlive)
-                {
-                    level.StartNewLife();
-                }
-                else if (level.TimeRemaining == TimeSpan.Zero)
-                {
-                    if (level.ReachedExit)
-                        LoadNextLevel();
-                    else
-                        ReloadCurrentLevel();
-                }
-            }
-
-            wasContinuePressed = continuePressed;
+            wasContinuePressed = false;
 
             virtualGamePad.Update(gameTime);
         }
 
-        private void LoadNextLevel()
+        private static Texture2D CreateSolidTexture(GraphicsDevice graphicsDevice, int width, int height, Color color)
         {
-            // move to the next level
-            levelIndex = (levelIndex + 1) % numberOfLevels;
-
-            // Unloads the content for the current level before loading the next one.
-            if (level != null)
-                level.Dispose();
-
-            // Load the level.
-            string levelPath = string.Format("Content/Levels/{0}.txt", levelIndex);
-            using (Stream fileStream = TitleContainer.OpenStream(levelPath))
-                level = new Level(Services, fileStream, levelIndex);
+            Texture2D texture = new Texture2D(graphicsDevice, width, height);
+            Color[] data = new Color[width * height];
+            for (int i = 0; i < data.Length; i++)
+                data[i] = color;
+            texture.SetData(data);
+            return texture;
         }
 
-        private void ReloadCurrentLevel()
+        private sealed class Pillar
         {
-            --levelIndex;
-            LoadNextLevel();
-        }
+            public Vector2 Position;
+            public Vector2 Size;
+            public Vector2 SlotSize;
+            public float SlotOffsetY;
 
-        /// <summary>
-        /// Draws the game from background to foreground.
-        /// </summary>
-        /// <param name="gameTime">Provides a snapshot of timing values.</param>
-        protected override void Draw(GameTime gameTime)
-        {
-            graphics.GraphicsDevice.Clear(Color.CornflowerBlue);
-
-            spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null,null, globalTransformation);
-
-            level.Draw(gameTime, spriteBatch);
-
-            DrawHud();
-
-            spriteBatch.End();
-
-            base.Draw(gameTime);
-        }
-
-        private void DrawHud()
-        {
-            Rectangle titleSafeArea = GraphicsDevice.Viewport.TitleSafeArea;
-            Vector2 hudLocation = new Vector2(titleSafeArea.X, titleSafeArea.Y);
-            //Vector2 center = new Vector2(titleSafeArea.X + titleSafeArea.Width / 2.0f,
-            //                             titleSafeArea.Y + titleSafeArea.Height / 2.0f);
-
-            Vector2 center = new Vector2(baseScreenSize.X / 2, baseScreenSize.Y / 2);
-
-            // Draw time remaining. Uses modulo division to cause blinking when the
-            // player is running out of time.
-            string timeString = "TIME: " + level.TimeRemaining.Minutes.ToString("00") + ":" + level.TimeRemaining.Seconds.ToString("00");
-            Color timeColor;
-            if (level.TimeRemaining > WarningTime ||
-                level.ReachedExit ||
-                (int)level.TimeRemaining.TotalSeconds % 2 == 0)
+            public Rectangle GetPillarRectangle()
             {
-                timeColor = Color.Yellow;
+                return new Rectangle(
+                    (int)(Position.X - Size.X / 2f),
+                    (int)(Position.Y - Size.Y),
+                    (int)Size.X,
+                    (int)Size.Y);
             }
-            else
-            {
-                timeColor = Color.Red;
-            }
-            DrawShadowedString(hudFont, timeString, hudLocation, timeColor);
 
-            // Draw score
-            float timeHeight = hudFont.MeasureString(timeString).Y;
-            DrawShadowedString(hudFont, "SCORE: " + level.Score.ToString(), hudLocation + new Vector2(0.0f, timeHeight * 1.2f), Color.Yellow);
-           
-            // Determine the status overlay message to show.
-            Texture2D status = null;
-            if (level.TimeRemaining == TimeSpan.Zero)
+            public Rectangle GetSlotRectangle()
             {
-                if (level.ReachedExit)
+                Rectangle pillarRect = GetPillarRectangle();
+                return new Rectangle(
+                    pillarRect.X + (pillarRect.Width - (int)SlotSize.X) / 2,
+                    pillarRect.Y - (int)SlotOffsetY - (int)SlotSize.Y,
+                    (int)SlotSize.X,
+                    (int)SlotSize.Y);
+            }
+        }
+
+        private void DrawMainScene(GameTime gameTime)
+        {
+            // Sky background.
+            Rectangle skyRect = new Rectangle(0, 0, (int)baseScreenSize.X, (int)baseScreenSize.Y);
+            spriteBatch.Draw(skyTexture, skyRect, Color.White);
+
+            // Simple moving clouds.
+            float t = (float)gameTime.TotalGameTime.TotalSeconds;
+            float cloudSpeed = 20f;
+            int cloudWidth = 160;
+            int cloudHeight = 60;
+
+            for (int i = 0; i < 3; i++)
+            {
+                float x = ((t * cloudSpeed) + i * 200f) % (baseScreenSize.X + cloudWidth) - cloudWidth;
+                float y = 60f + i * 40f;
+                Rectangle cloudRect = new Rectangle((int)x, (int)y, cloudWidth, cloudHeight);
+                spriteBatch.Draw(skyTexture, cloudRect, new Color(250, 250, 250));
+            }
+
+            // Ground strip.
+            Rectangle groundRect = new Rectangle(0, (int)(baseScreenSize.Y - 20), (int)baseScreenSize.X, 20);
+            spriteBatch.Draw(pillarTexture, groundRect, new Color(180, 180, 180));
+
+            if (pillars != null)
+            {
+                for (int i = 0; i < pillars.Length; i++)
                 {
-                    status = winOverlay;
+                    Pillar pillar = pillars[i];
+                    Rectangle pillarRect = pillar.GetPillarRectangle();
+                    spriteBatch.Draw(pillarTexture, pillarRect, Color.White);
+
+                    int stripeCount = 4;
+                    int stripeWidth = pillarRect.Width / (stripeCount * 2);
+                    for (int s = 0; s < stripeCount; s++)
+                    {
+                        int x = pillarRect.X + stripeWidth + s * stripeWidth * 2;
+                        Rectangle stripe = new Rectangle(x, pillarRect.Y, stripeWidth, pillarRect.Height);
+                        spriteBatch.Draw(pillarTexture, stripe, new Color(210, 210, 210));
+                    }
+
+                    Rectangle capitalRect = new Rectangle(pillarRect.X - 5, pillarRect.Y - 10, pillarRect.Width + 10, 10);
+                    spriteBatch.Draw(pillarTexture, capitalRect, new Color(240, 240, 240));
+
+                    Rectangle slotRect = pillar.GetSlotRectangle();
+                    spriteBatch.Draw(slotTexture, slotRect, Color.White);
+
+                    if (pillarHasItem != null && pillarHasItem[i])
+                    {
+                        // Draw a simple item as a filled rectangle inside the slot, with a per-pillar color.
+                        Rectangle itemRect = slotRect;
+                        itemRect.Inflate(-10, -10);
+                        Color itemColor = (pillarItemColors != null && i < pillarItemColors.Length)
+                            ? pillarItemColors[i]
+                            : Color.Gold;
+                        spriteBatch.Draw(playerTexture, itemRect, itemColor);
+                    }
+
+                    DrawRectangleOutline(slotRect, Color.DarkBlue);
                 }
-                else
-                {
-                    status = loseOverlay;
-                }
-            }
-            else if (!level.Player.IsAlive)
-            {
-                status = diedOverlay;
             }
 
-            if (status != null)
-            {
-                // Draw status message.
-                Vector2 statusSize = new Vector2(status.Width, status.Height);
-                spriteBatch.Draw(status, center - statusSize / 2, Color.White);
-            }
+            // Draw the player.
+            Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
+            spriteBatch.Draw(playerTexture, playerRect, Color.White);
 
-            if (touchState.IsConnected)
-                virtualGamePad.Draw(spriteBatch);
+            string title = "Insert the three items of Zeus";
+            Vector2 titleSize = hudFont.MeasureString(title);
+            Vector2 titlePos = new Vector2((baseScreenSize.X - titleSize.X) / 2f, 40f);
+            spriteBatch.DrawString(hudFont, title, titlePos, Color.Yellow);
         }
 
-        private void DrawShadowedString(SpriteFont font, string value, Vector2 position, Color color)
+        private void DrawRectangleOutline(Rectangle rect, Color color)
         {
-            spriteBatch.DrawString(font, value, position + new Vector2(1.0f, 1.0f), Color.Black);
-            spriteBatch.DrawString(font, value, position, color);
+            if (pillarTexture == null)
+                return;
+
+            spriteBatch.Draw(pillarTexture, new Rectangle(rect.X, rect.Y, rect.Width, 2), color);
+            spriteBatch.Draw(pillarTexture, new Rectangle(rect.X, rect.Bottom - 2, rect.Width, 2), color);
+            spriteBatch.Draw(pillarTexture, new Rectangle(rect.X, rect.Y, 2, rect.Height), color);
+            spriteBatch.Draw(pillarTexture, new Rectangle(rect.Right - 2, rect.Y, 2, rect.Height), color);
         }
     }
 }
