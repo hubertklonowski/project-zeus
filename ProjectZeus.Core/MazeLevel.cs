@@ -411,6 +411,12 @@ namespace ProjectZeus.Core
             return false;
         }
         
+        /// <summary>
+        /// Clamps a position to stay within the visible window bounds.
+        /// </summary>
+        /// <param name="position">The position to clamp</param>
+        /// <param name="size">The size of the entity at this position</param>
+        /// <returns>A position guaranteed to keep the entity fully within the window</returns>
         private Vector2 ClampPositionToWindowBounds(Vector2 position, Vector2 size)
         {
             return new Vector2(
