@@ -366,7 +366,7 @@ namespace ProjectZeus.Core
                 return;
 
             // Update the mine level
-            mineLevel.Update(gameTime, keyboardState, gamePadState, AccelerometerState.Default, DisplayOrientation.LandscapeLeft);
+            mineLevel.Update(gameTime, keyboardState, gamePadState, new AccelerometerState(Vector3.Zero, false), DisplayOrientation.LandscapeLeft);
 
             // Check if player presses E to collect an item
             if (keyboardState.IsKeyDown(Keys.E) && collectedItem == null)
