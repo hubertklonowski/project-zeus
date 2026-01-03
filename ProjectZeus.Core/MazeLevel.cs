@@ -247,8 +247,7 @@ namespace ProjectZeus.Core
             }
             
             // Clamp player position to window bounds to prevent going off-screen
-            playerPosition.X = Math.Max(0, Math.Min(baseScreenSize.X - playerSize.X, playerPosition.X));
-            playerPosition.Y = Math.Max(0, Math.Min(baseScreenSize.Y - playerSize.Y, playerPosition.Y));
+            playerPosition = ClampPositionToWindowBounds(playerPosition, playerSize);
             
             // Update minotaur
             UpdateMinotaur(dt);
@@ -360,8 +359,7 @@ namespace ProjectZeus.Core
             }
             
             // Clamp minotaur position to window bounds
-            minotaurPosition.X = Math.Max(0, Math.Min(baseScreenSize.X - minotaurSize.X, minotaurPosition.X));
-            minotaurPosition.Y = Math.Max(0, Math.Min(baseScreenSize.Y - minotaurSize.Y, minotaurPosition.Y));
+            minotaurPosition = ClampPositionToWindowBounds(minotaurPosition, minotaurSize);
             
             // Check collision with player
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y,
@@ -382,9 +380,7 @@ namespace ProjectZeus.Core
                 if (!CheckWallCollision(pushedPosition, playerSize))
                 {
                     // Also check window bounds
-                    pushedPosition.X = Math.Max(0, Math.Min(baseScreenSize.X - playerSize.X, pushedPosition.X));
-                    pushedPosition.Y = Math.Max(0, Math.Min(baseScreenSize.Y - playerSize.Y, pushedPosition.Y));
-                    playerPosition = pushedPosition;
+                    playerPosition = ClampPositionToWindowBounds(pushedPosition, playerSize);
                 }
             }
         }
@@ -411,6 +407,14 @@ namespace ProjectZeus.Core
             }
             
             return false;
+        }
+        
+        private Vector2 ClampPositionToWindowBounds(Vector2 position, Vector2 size)
+        {
+            return new Vector2(
+                Math.Max(0, Math.Min(baseScreenSize.X - size.X, position.X)),
+                Math.Max(0, Math.Min(baseScreenSize.Y - size.Y, position.Y))
+            );
         }
         
         public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice)
