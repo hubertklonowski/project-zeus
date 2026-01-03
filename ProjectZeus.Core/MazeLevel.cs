@@ -376,11 +376,13 @@ namespace ProjectZeus.Core
                 
                 Vector2 pushedPosition = playerPosition + pushDir * 50f * dt;
                 
-                // Only apply push if it doesn't push player into a wall or off-screen
+                // Clamp to window bounds first
+                pushedPosition = ClampPositionToWindowBounds(pushedPosition, playerSize);
+                
+                // Only apply push if it doesn't push player into a wall
                 if (!CheckWallCollision(pushedPosition, playerSize))
                 {
-                    // Also check window bounds
-                    playerPosition = ClampPositionToWindowBounds(pushedPosition, playerSize);
+                    playerPosition = pushedPosition;
                 }
             }
         }
