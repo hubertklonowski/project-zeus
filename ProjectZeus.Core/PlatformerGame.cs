@@ -102,6 +102,9 @@ namespace ProjectZeus.Core
         private const int PORTAL_INNER_GREEN = 50;
         private const int PORTAL_INNER_BLUE = 200;
 
+        // Random instance for mine level
+        private Random mineRandom = new Random();
+
         public PlatformerGame()
         {
             graphics = new GraphicsDeviceManager(this);
@@ -268,7 +271,6 @@ namespace ProjectZeus.Core
             
             // Create carts moving on rails
             mineCarts = new List<MineCart>();
-            var random = new Random();
             
             mineCarts.Add(new MineCart 
             { 
@@ -293,8 +295,8 @@ namespace ProjectZeus.Core
                 mineBats.Add(new MineBat
                 {
                     Position = new Vector2(200 + i * 150, 150 + i * 40),
-                    Velocity = new Vector2((float)(random.NextDouble() * 2 - 1) * 60f, (float)(random.NextDouble() * 2 - 1) * 60f),
-                    ChangeDirectionTimer = (float)random.NextDouble() * 2f
+                    Velocity = new Vector2((float)(mineRandom.NextDouble() * 2 - 1) * 60f, (float)(mineRandom.NextDouble() * 2 - 1) * 60f),
+                    ChangeDirectionTimer = (float)mineRandom.NextDouble() * 2f
                 });
             }
             
@@ -302,7 +304,7 @@ namespace ProjectZeus.Core
             mineStalactites = new List<Rectangle>();
             for (int x = 100; x < 700; x += 80)
             {
-                int height = 30 + random.Next(30);
+                int height = 30 + mineRandom.Next(30);
                 mineStalactites.Add(new Rectangle(x, 0, 20, height));
             }
             
@@ -558,10 +560,9 @@ namespace ProjectZeus.Core
             // Update bats
             if (mineBats != null)
             {
-                var random = new Random();
                 foreach (var bat in mineBats)
                 {
-                    bat.Update(dt, random);
+                    bat.Update(dt, mineRandom);
                 }
             }
 
