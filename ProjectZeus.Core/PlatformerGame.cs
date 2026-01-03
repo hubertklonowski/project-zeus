@@ -68,6 +68,12 @@ namespace ProjectZeus.Core
         // Scene management.
         private bool inZeusFightScene;
         private ZeusFightScene zeusFightScene;
+        
+        // Maze level management.
+        private bool inMazeLevel;
+        private MazeLevel mazeLevel;
+        private bool hasCollectedItem;
+        private KeyboardState previousKeyboardState;
 
         public PlatformerGame()
         {
@@ -154,6 +160,12 @@ namespace ProjectZeus.Core
             inZeusFightScene = false;
             zeusFightScene = new ZeusFightScene();
             zeusFightScene.LoadContent(GraphicsDevice, hudFont);
+            
+            inMazeLevel = false;
+            mazeLevel = new MazeLevel();
+            mazeLevel.LoadContent(GraphicsDevice, hudFont);
+            hasCollectedItem = false;
+            previousKeyboardState = Keyboard.GetState();
         }
 
         public void ScalePresentationArea()
@@ -176,9 +188,32 @@ namespace ProjectZeus.Core
         /// <param name="gameTime">Provides a snapshot of timing values.</param>
         protected override void Update(GameTime gameTime)
         {
+            // Handle polling for our input
+            keyboardState = Keyboard.GetState();
+            
             if (inZeusFightScene)
             {
                 zeusFightScene.Update(gameTime);
+                base.Update(gameTime);
+                return;
+            }
+            
+            if (inMazeLevel)
+            {
+                mazeLevel.Update(gameTime, keyboardState);
+                
+                // Check if player completed the maze
+                if (mazeLevel.IsCompleted)
+                {
+                    inMazeLevel = false;
+                    hasCollectedItem = mazeLevel.HasItem;
+                    
+                    // Create a new maze for next time
+                    mazeLevel = new MazeLevel();
+                    mazeLevel.LoadContent(GraphicsDevice, hudFont);
+                }
+                
+                previousKeyboardState = keyboardState;
                 base.Update(gameTime);
                 return;
             }
@@ -257,10 +292,19 @@ namespace ProjectZeus.Core
             if (playerPosition.X + playerSize.X > baseScreenSize.X)
                 playerPosition.X = baseScreenSize.X - playerSize.X;
 
-            // Interaction: press E near a pillar to insert an item (toggle for now).
-            if (keyboardState.IsKeyDown(Keys.E))
+            // Interaction: press M to enter maze level, press E near a pillar to insert an item
+            bool eKeyPressed = keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E);
+            bool mKeyPressed = keyboardState.IsKeyDown(Keys.M) && !previousKeyboardState.IsKeyDown(Keys.M);
+            
+            if (eKeyPressed && hasCollectedItem)
             {
                 TryInsertItemAtPlayer();
+            }
+            
+            if (mKeyPressed && !hasCollectedItem)
+            {
+                // Enter maze level to collect an item
+                inMazeLevel = true;
             }
 
             // Check if all items have been inserted; if so, switch to ZeusFightScene.
@@ -289,12 +333,16 @@ namespace ProjectZeus.Core
                 }
             }
 
+            previousKeyboardState = keyboardState;
             base.Update(gameTime);
         }
 
         private void TryInsertItemAtPlayer()
         {
             if (pillars == null || pillarHasItem == null)
+                return;
+            
+            if (!hasCollectedItem)
                 return;
 
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
@@ -309,7 +357,12 @@ namespace ProjectZeus.Core
 
                 if (playerRect.Intersects(interactionRect))
                 {
-                    pillarHasItem[i] = true; // simple: once inserted, stays there
+                    // Only allow placing item on empty pillars
+                    if (!pillarHasItem[i])
+                    {
+                        pillarHasItem[i] = true;
+                        hasCollectedItem = false; // Item has been placed
+                    }
                     break;
                 }
             }
@@ -321,6 +374,14 @@ namespace ProjectZeus.Core
             {
                 // Let the Zeus fight scene draw its background and the player.
                 zeusFightScene.Draw(spriteBatch, GraphicsDevice, playerTexture, playerPosition, playerSize);
+                base.Draw(gameTime);
+                return;
+            }
+            
+            if (inMazeLevel)
+            {
+                // Draw the maze level
+                mazeLevel.Draw(spriteBatch, GraphicsDevice);
                 base.Draw(gameTime);
                 return;
             }
@@ -462,6 +523,14 @@ namespace ProjectZeus.Core
             Vector2 titleSize = hudFont.MeasureString(title);
             Vector2 titlePos = new Vector2((baseScreenSize.X - titleSize.X) / 2f, 40f);
             spriteBatch.DrawString(hudFont, title, titlePos, Color.Yellow);
+            
+            // Instructions
+            string instructions = hasCollectedItem 
+                ? "Press E near an empty pillar to place the item" 
+                : "Press M to enter the maze and find an item";
+            Vector2 instructionsSize = hudFont.MeasureString(instructions);
+            Vector2 instructionsPos = new Vector2((baseScreenSize.X - instructionsSize.X) / 2f, 70f);
+            spriteBatch.DrawString(hudFont, instructions, instructionsPos, Color.White);
         }
 
         private void DrawRectangleOutline(Rectangle rect, Color color)
