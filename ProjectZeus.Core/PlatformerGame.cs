@@ -167,9 +167,10 @@ namespace ProjectZeus.Core
             playerPosition = new Vector2(centerX - spacing - 80f, groundTop - playerSize.Y);
             playerVelocity = Vector2.Zero;
             isOnGround = true;
-            
+
             // Place portal on the right side of the screen
-            portalPosition = new Vector2(baseScreenSize.X - portalMarginFromEdge, groundTop - portalSize.Y);
+            float portalX = (pillars[0].Position.X + pillars[1].Position.X) / 2f - portalSize.X / 2f;
+            portalPosition = new Vector2(portalX, groundTop - portalSize.Y);
 
             inZeusFightScene = false;
             zeusFightScene = new ZeusFightScene();
