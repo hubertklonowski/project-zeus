@@ -19,6 +19,15 @@ namespace ProjectZeus.Core
         // Random number generator for rock throwing
         private static readonly System.Random random = new System.Random();
         
+        // Constants for rock throwing
+        private const float ThrowAngleVariation = 40f; // Degrees of variation from straight down
+        private const float ThrowAngleOffset = 20f; // Offset to center the variation
+        
+        // Constants for platform collision detection
+        private const int CollisionTopOffset = 2;
+        private const int CollisionHeight = 6;
+        private const int CollisionVerticalThreshold = 20;
+        
         // Mountain platforms
         private List<Platform> platforms;
         
@@ -265,8 +274,8 @@ namespace ProjectZeus.Core
         
         private void ThrowRock()
         {
-            // Goat throws rock downward with some randomness
-            float angle = MathHelper.ToRadians(90f + (float)(random.NextDouble() * 40 - 20)); // 70-110 degrees
+            // Goat throws rock downward with some randomness (70-110 degrees)
+            float angle = MathHelper.ToRadians(90f + (float)(random.NextDouble() * ThrowAngleVariation - ThrowAngleOffset));
             float speed = 200f;
             
             rocks.Add(new Rock
@@ -292,10 +301,10 @@ namespace ProjectZeus.Core
                     (int)platform.Size.Y);
                 
                 // Top collision (landing on platform)
-                Rectangle topRect = new Rectangle(platformRect.X, platformRect.Y - 2, platformRect.Width, 6);
+                Rectangle topRect = new Rectangle(platformRect.X, platformRect.Y - CollisionTopOffset, platformRect.Width, CollisionHeight);
                 
                 if (playerRect.Bottom > topRect.Top &&
-                    playerRect.Bottom <= topRect.Top + 20 &&
+                    playerRect.Bottom <= topRect.Top + CollisionVerticalThreshold &&
                     playerRect.Right > topRect.Left &&
                     playerRect.Left < topRect.Right &&
                     playerVelocity.Y >= 0)
