@@ -68,6 +68,24 @@ namespace ProjectZeus.Core
         // Scene management.
         private bool inZeusFightScene;
         private ZeusFightScene zeusFightScene;
+        
+        // Maze level management.
+        private bool inMazeLevel;
+        private MazeLevel mazeLevel;
+        private bool hasCollectedItem;
+        private KeyboardState previousKeyboardState;
+        
+        // Portal for maze entrance
+        private Vector2 mazePortalPosition;
+        private Vector2 mazePortalSize = new Vector2(60, 80);
+        private Texture2D portalTexture;
+        private readonly Color mazePortalBaseColor = new Color(100, 50, 200);
+        private const float portalMarginFromEdge = 100f;
+        private const float portalPulseFrequency = 3f;
+        private const float portalPulseAmplitude = 0.3f;
+        private const float portalPulseOffset = 0.7f;
+        
+        // Mountain level management.
         private bool inMountainLevel;
         private MountainLevel mountainLevel;
 
@@ -75,8 +93,8 @@ namespace ProjectZeus.Core
         private bool hasItemFromMountain;
         
         // Portal to mountain level
-        private Vector2 portalPosition;
-        private Vector2 portalSize = new Vector2(60, 80);
+        private Vector2 mountainPortalPosition;
+        private Vector2 mountainPortalSize = new Vector2(60, 80);
 
         public PlatformerGame()
         {
@@ -133,6 +151,7 @@ namespace ProjectZeus.Core
             slotTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(200, 200, 255));
             skyTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(135, 206, 235));
             playerTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(255, 220, 180));
+            portalTexture = CreateSolidTexture(GraphicsDevice, 1, 1, mazePortalBaseColor);
 
             // Set up three pillars across the base screen, starting from the bottom.
             float centerX = baseScreenSize.X / 2f;
@@ -160,9 +179,19 @@ namespace ProjectZeus.Core
             playerVelocity = Vector2.Zero;
             isOnGround = true;
 
+            // Place maze portal between first and second pillar
+            float mazePortalX = (pillars[0].Position.X + pillars[1].Position.X) / 2f - mazePortalSize.X / 2f;
+            mazePortalPosition = new Vector2(mazePortalX, groundTop - mazePortalSize.Y);
+
             inZeusFightScene = false;
             zeusFightScene = new ZeusFightScene();
             zeusFightScene.LoadContent(GraphicsDevice, hudFont);
+            
+            inMazeLevel = false;
+            mazeLevel = new MazeLevel();
+            mazeLevel.LoadContent(GraphicsDevice, hudFont);
+            hasCollectedItem = false;
+            previousKeyboardState = Keyboard.GetState();
 
             inMountainLevel = false;
             mountainLevel = new MountainLevel();
@@ -170,7 +199,8 @@ namespace ProjectZeus.Core
             hasItemFromMountain = false;
             
             // Position portal to mountain level on the right side of the screen
-            portalPosition = new Vector2(baseScreenSize.X - 100f, groundTop - portalSize.Y);
+            float mountainPortalX = baseScreenSize.X - 100f;
+            mountainPortalPosition = new Vector2(mountainPortalX, groundTop - mountainPortalSize.Y);
         }
 
         public void ScalePresentationArea()
@@ -199,11 +229,33 @@ namespace ProjectZeus.Core
                 base.Update(gameTime);
                 return;
             }
+            
+            if (inMazeLevel)
+            {
+                // Handle polling for maze input separately
+                keyboardState = Keyboard.GetState();
+                mazeLevel.Update(gameTime, keyboardState);
+                
+                // Check if player completed the maze
+                if (mazeLevel.IsCompleted)
+                {
+                    inMazeLevel = false;
+                    hasCollectedItem = mazeLevel.HasItem;
+                    
+                    // Create a new maze for next time
+                    mazeLevel = new MazeLevel();
+                    mazeLevel.LoadContent(GraphicsDevice, hudFont);
+                }
+                
+                previousKeyboardState = keyboardState;
+                base.Update(gameTime);
+                return;
+            }
 
             if (inMountainLevel)
             {
                 UpdateMountainLevel(gameTime);
-                base.Update(gameTime);
+                previousKeyboardState = keyboardState;
                 return;
             }
 
@@ -288,11 +340,34 @@ namespace ProjectZeus.Core
             if (playerPosition.X + playerSize.X > baseScreenSize.X)
                 playerPosition.X = baseScreenSize.X - playerSize.X;
 
-            // Interaction: press E near a pillar to insert an item or enter portal.
-            if (keyboardState.IsKeyDown(Keys.E))
+            // Interaction: press E near a pillar to insert an item or enter portals
+            bool eKeyPressed = keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E);
+            
+            if (eKeyPressed)
             {
-                TryInsertItemAtPlayer();
-                TryEnterPortal();
+                // Try placing maze or mountain item in a pillar
+                if (hasCollectedItem || hasItemFromMountain)
+                {
+                    TryInsertItemAtPlayer();
+                }
+
+                // Try entering mountain portal on E press
+                TryEnterMountainPortal();
+            }
+
+            // Check portal collision to enter maze (only when not carrying item)
+            if (!hasCollectedItem)
+            {
+                Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, 
+                                                     (int)playerSize.X, (int)playerSize.Y);
+                Rectangle portalRect = new Rectangle((int)mazePortalPosition.X, (int)mazePortalPosition.Y,
+                                                     (int)mazePortalSize.X, (int)mazePortalSize.Y);
+                
+                if (playerRect.Intersects(portalRect))
+                {
+                    // Enter maze level to collect an item
+                    inMazeLevel = true;
+                }
             }
 
             // Check if all items have been inserted; if so, switch to ZeusFightScene.
@@ -320,6 +395,8 @@ namespace ProjectZeus.Core
                     isOnGround = true;
                 }
             }
+
+            previousKeyboardState = keyboardState;
         }
 
         private void UpdateMountainLevel(GameTime gameTime)
@@ -392,12 +469,14 @@ namespace ProjectZeus.Core
             {
                 ReturnToPillarRoom();
             }
+
+            previousKeyboardState = keyboardState;
         }
 
-        private void TryEnterPortal()
+        private void TryEnterMountainPortal()
         {
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
-            Rectangle portalRect = new Rectangle((int)portalPosition.X, (int)portalPosition.Y, (int)portalSize.X, (int)portalSize.Y);
+            Rectangle portalRect = new Rectangle((int)mountainPortalPosition.X, (int)mountainPortalPosition.Y, (int)mountainPortalSize.X, (int)mountainPortalSize.Y);
 
             if (playerRect.Intersects(portalRect))
             {
@@ -423,7 +502,7 @@ namespace ProjectZeus.Core
             
             // Place player near portal
             float groundTop = baseScreenSize.Y - 20f;
-            playerPosition = new Vector2(portalPosition.X - 60f, groundTop - playerSize.Y);
+            playerPosition = new Vector2(mountainPortalPosition.X - 60f, groundTop - playerSize.Y);
             playerVelocity = Vector2.Zero;
             isOnGround = true;
         }
@@ -461,6 +540,10 @@ namespace ProjectZeus.Core
             if (pillars == null || pillarHasItem == null)
                 return;
 
+            // Nothing to place
+            if (!hasCollectedItem && !hasItemFromMountain)
+                return;
+
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
 
             for (int i = 0; i < pillars.Length; i++)
@@ -471,15 +554,21 @@ namespace ProjectZeus.Core
                 Rectangle interactionRect = slotRect;
                 interactionRect.Inflate(20, 20);
 
-                if (playerRect.Intersects(interactionRect))
+                if (playerRect.Intersects(interactionRect) && !pillarHasItem[i])
                 {
-                    // Check if player has mountain item to place
-                    if (hasItemFromMountain && !pillarHasItem[i])
+                    // Place maze or mountain item into the pillar slot
+                    pillarHasItem[i] = true;
+
+                    if (hasCollectedItem)
                     {
-                        pillarHasItem[i] = true;
-                        hasItemFromMountain = false;
-                        break;
+                        hasCollectedItem = false;
                     }
+                    else if (hasItemFromMountain)
+                    {
+                        hasItemFromMountain = false;
+                    }
+
+                    break;
                 }
             }
         }
@@ -490,6 +579,14 @@ namespace ProjectZeus.Core
             {
                 // Let the Zeus fight scene draw its background and the player.
                 zeusFightScene.Draw(spriteBatch, GraphicsDevice, playerTexture, playerPosition, playerSize);
+                base.Draw(gameTime);
+                return;
+            }
+            
+            if (inMazeLevel)
+            {
+                // Draw the maze level
+                mazeLevel.Draw(spriteBatch, GraphicsDevice);
                 base.Draw(gameTime);
                 return;
             }
@@ -638,25 +735,71 @@ namespace ProjectZeus.Core
                 }
             }
 
+            // Draw portal (if player doesn't have an item)
+            if (!hasCollectedItem)
+            {
+                Rectangle portalRect = new Rectangle((int)mazePortalPosition.X, (int)mazePortalPosition.Y,
+                                                     (int)mazePortalSize.X, (int)mazePortalSize.Y);
+                
+                // Animated portal effect using time
+                var portalTimeNew = (float)gameTime.TotalGameTime.TotalSeconds;
+                float pulseNew = (float)(Math.Sin(portalTimeNew * portalPulseFrequency) * portalPulseAmplitude + portalPulseOffset);
+                
+                // Draw portal base
+                spriteBatch.Draw(portalTexture, portalRect, mazePortalBaseColor * pulseNew);
+                
+                // Draw portal inner glow
+                Rectangle innerRect = portalRect;
+                innerRect.Inflate(-8, -8);
+                spriteBatch.Draw(portalTexture, innerRect, new Color(150, 100, 255) * pulseNew);
+                
+                // Draw portal core
+                Rectangle coreRect = portalRect;
+                coreRect.Inflate(-16, -16);
+                spriteBatch.Draw(portalTexture, coreRect, Color.White * pulseNew);
+                
+                DrawRectangleOutline(portalRect, new Color(150, 100, 255));
+            }
+
             // Draw the player.
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
             spriteBatch.Draw(playerTexture, playerRect, Color.White);
-
-            // Draw portal to mountain level
-            Rectangle portalRect = new Rectangle((int)portalPosition.X, (int)portalPosition.Y, (int)portalSize.X, (int)portalSize.Y);
-            spriteBatch.Draw(pillarTexture, portalRect, new Color(100, 50, 150));
-            DrawRectangleOutline(portalRect, new Color(150, 100, 200));
             
-            // Draw portal symbol (simple M for Mountain)
-            if (hudFont != null)
+            // If player has an item, draw it above their head
+            if (hasCollectedItem)
             {
-                string portalLabel = "M";
-                Vector2 portalLabelSize = hudFont.MeasureString(portalLabel);
-                Vector2 portalLabelPos = new Vector2(
-                    portalPosition.X + (portalSize.X - portalLabelSize.X) / 2f,
-                    portalPosition.Y + (portalSize.Y - portalLabelSize.Y) / 2f);
-                spriteBatch.DrawString(hudFont, portalLabel, portalLabelPos, Color.White);
+                Rectangle itemRect = new Rectangle((int)playerPosition.X + (int)playerSize.X / 2 - 12, 
+                                                   (int)playerPosition.Y - 25, 24, 24);
+                spriteBatch.Draw(playerTexture, itemRect, Color.Gold);
+                DrawRectangleOutline(itemRect, Color.Orange);
             }
+
+            // Draw portal to mountain level (same graphic as maze, different position + label)
+            Rectangle mountainPortalRect = new Rectangle(
+                (int)mountainPortalPosition.X,
+                (int)mountainPortalPosition.Y,
+                (int)mountainPortalSize.X,
+                (int)mountainPortalSize.Y);
+
+            // Reuse same pulse animation as maze portal
+            float portalTime = (float)gameTime.TotalGameTime.TotalSeconds;
+            float pulse = (float)(Math.Sin(portalTime * portalPulseFrequency) * portalPulseAmplitude + portalPulseOffset);
+
+            // Base
+            spriteBatch.Draw(portalTexture, mountainPortalRect, mazePortalBaseColor * pulse);
+
+            // Inner glow
+            Rectangle mountainInnerRect = mountainPortalRect;
+            mountainInnerRect.Inflate(-8, -8);
+            spriteBatch.Draw(portalTexture, mountainInnerRect, new Color(150, 100, 255) * pulse);
+
+            // Core
+            Rectangle mountainCoreRect = mountainPortalRect;
+            mountainCoreRect.Inflate(-16, -16);
+            spriteBatch.Draw(portalTexture, mountainCoreRect, Color.White * pulse);
+
+            // Outline
+            DrawRectangleOutline(mountainPortalRect, new Color(150, 100, 255));
 
             // Draw inventory indicator if player has mountain item
             if (hasItemFromMountain)
@@ -678,6 +821,14 @@ namespace ProjectZeus.Core
             Vector2 titleSize = hudFont.MeasureString(title);
             Vector2 titlePos = new Vector2((baseScreenSize.X - titleSize.X) / 2f, 40f);
             spriteBatch.DrawString(hudFont, title, titlePos, Color.Yellow);
+            
+            // Instructions
+            string instructions = hasCollectedItem 
+                ? "Press E near an empty pillar to place the item" 
+                : "Walk into the portal to enter the maze";
+            Vector2 instructionsSize = hudFont.MeasureString(instructions);
+            Vector2 instructionsPos = new Vector2((baseScreenSize.X - instructionsSize.X) / 2f, 70f);
+            spriteBatch.DrawString(hudFont, instructions, instructionsPos, Color.White);
         }
 
         private void DrawRectangleOutline(Rectangle rect, Color color)
