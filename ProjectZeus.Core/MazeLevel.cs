@@ -34,6 +34,9 @@ namespace ProjectZeus.Core
         private const float minotaurSpawnDelay = 5f; // Respawn after 5 seconds
         private Random random;
         
+        // Entrance/exit position
+        private Vector2 entrancePosition;
+        
         // Graphics
         private Texture2D solidTexture;
         private SpriteFont font;
@@ -145,6 +148,8 @@ namespace ProjectZeus.Core
                         playerPosition = new Vector2(x * cellSize + cellSize / 2 - playerSize.X / 2,
                                                      y * cellSize + cellSize / 2 - playerSize.Y / 2);
                         playerVelocity = Vector2.Zero;
+                        entrancePosition = new Vector2(x * cellSize + cellSize / 2,
+                                                      y * cellSize + cellSize / 2);
                         goto PlayerPlaced;
                     }
                 }
@@ -244,27 +249,13 @@ namespace ProjectZeus.Core
             // Check if player wants to exit (reached starting position with item)
             if (itemCollected)
             {
-                // Find entrance cell
-                for (int y = 1; y < mazeHeight - 1; y++)
+                float distance = Vector2.Distance(playerPosition + playerSize / 2, entrancePosition);
+                
+                if (distance < 30)
                 {
-                    for (int x = 1; x < mazeWidth - 1; x++)
-                    {
-                        if (!walls[x, y])
-                        {
-                            Vector2 entrancePos = new Vector2(x * cellSize + cellSize / 2,
-                                                             y * cellSize + cellSize / 2);
-                            float distance = Vector2.Distance(playerPosition + playerSize / 2, entrancePos);
-                            
-                            if (distance < 30)
-                            {
-                                IsCompleted = true;
-                                return;
-                            }
-                            goto ExitCheck;
-                        }
-                    }
+                    IsCompleted = true;
+                    return;
                 }
-                ExitCheck:;
             }
         }
         
@@ -466,11 +457,36 @@ namespace ProjectZeus.Core
                 }
             }
             
+            // Draw entrance marker if visible and item is collected
+            if (itemCollected)
+            {
+                int entranceCellX = (int)(entrancePosition.X / cellSize);
+                int entranceCellY = (int)(entrancePosition.Y / cellSize);
+                int entranceDx = Math.Abs(entranceCellX - playerCellX);
+                int entranceDy = Math.Abs(entranceCellY - playerCellY);
+                
+                if (entranceDx <= visibilityRadius && entranceDy <= visibilityRadius)
+                {
+                    Rectangle entranceRect = new Rectangle((int)(entrancePosition.X - 14), (int)(entrancePosition.Y - 14), 28, 28);
+                    spriteBatch.Draw(solidTexture, entranceRect, new Color(0, 255, 0, 128)); // Green with transparency
+                    DrawRectangleOutline(spriteBatch, entranceRect, Color.LimeGreen);
+                }
+            }
+            
             // Draw player
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y,
                                                  (int)playerSize.X, (int)playerSize.Y);
             spriteBatch.Draw(solidTexture, playerRect, new Color(255, 220, 180));
             DrawRectangleOutline(spriteBatch, playerRect, new Color(200, 160, 120));
+            
+            // If carrying item, draw it above player
+            if (itemCollected)
+            {
+                Rectangle carriedItemRect = new Rectangle((int)playerPosition.X + (int)playerSize.X / 2 - 10,
+                                                         (int)playerPosition.Y - 18, 20, 20);
+                spriteBatch.Draw(solidTexture, carriedItemRect, Color.Gold);
+                DrawRectangleOutline(spriteBatch, carriedItemRect, Color.Orange);
+            }
             
             // Draw UI
             string instructions = "Navigate the maze! Press E near the golden item to collect it.";

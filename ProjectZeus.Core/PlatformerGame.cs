@@ -518,6 +518,15 @@ namespace ProjectZeus.Core
             // Draw the player.
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
             spriteBatch.Draw(playerTexture, playerRect, Color.White);
+            
+            // If player has an item, draw it above their head
+            if (hasCollectedItem)
+            {
+                Rectangle itemRect = new Rectangle((int)playerPosition.X + (int)playerSize.X / 2 - 12, 
+                                                   (int)playerPosition.Y - 25, 24, 24);
+                spriteBatch.Draw(playerTexture, itemRect, Color.Gold);
+                DrawRectangleOutline(itemRect, Color.Orange);
+            }
 
             string title = "Insert the three items of Zeus";
             Vector2 titleSize = hudFont.MeasureString(title);
