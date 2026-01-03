@@ -179,12 +179,16 @@ namespace ProjectZeus.Core
             playerVelocity = Vector2.Zero;
             isOnGround = true;
 
-            // Create portal to mine level (on the right side of the screen) - make it BIG and VISIBLE
+            // Create portal to mine level between pillars 2 and 3
             portalTexture = CreateSolidTexture(GraphicsDevice, 1, 1, Color.White);
-            float portalWidth = 100f;  // Much larger
-            float portalHeight = 140f;  // Much taller
-            float portalX = baseScreenSize.X - portalWidth - 50f;  // Closer to edge
+            float portalWidth = 80f;
+            float portalHeight = 130f;
+
+            // Position horizontally midway between middle and right pillars
+            float xBetween = (pillars[1].Position.X + pillars[2].Position.X) / 2f;
+            float portalX = xBetween - portalWidth / 2f;
             float portalY = groundTop - portalHeight;
+
             portalRect = new Rectangle((int)portalX, (int)portalY, (int)portalWidth, (int)portalHeight);
             portalAnimationTime = 0f;
 
@@ -706,38 +710,14 @@ namespace ProjectZeus.Core
                 Color portalColor1 = new Color((byte)(255 * pulse), (byte)(100 * pulse), (byte)(255 * pulse));
                 Color portalColor2 = new Color((byte)(200 * fastPulse), (byte)(50 * fastPulse), (byte)(255 * fastPulse));
 
-                // Draw outer glow for visibility
-                Rectangle glowRect = portalRect;
-                glowRect.Inflate(15, 15);
-                spriteBatch.Draw(portalTexture, glowRect, new Color((byte)(255 * fastPulse), (byte)(100 * fastPulse), (byte)(255 * fastPulse), (byte)100));
-
                 // Draw portal frame - BRIGHT
                 spriteBatch.Draw(portalTexture, portalRect, portalColor1);
                 
-                // Draw inner portal with different color
+                // Draw iner portal with different color
                 Rectangle innerPortal = portalRect;
                 innerPortal.Inflate(-8, -8);
                 spriteBatch.Draw(portalTexture, innerPortal, portalColor2);
 
-                // Draw portal outline - THICK and BRIGHT
-                DrawRectangleOutline(portalRect, new Color(255, 0, 255)); // Bright magenta
-                Rectangle thickOutline = portalRect;
-                thickOutline.Inflate(3, 3);
-                DrawRectangleOutline(thickOutline, new Color(200, 0, 200));
-
-                // Draw "MINE LEVEL" text above portal - LARGE and BRIGHT
-                string portalLabel = ">>> MINE <<<";
-                Vector2 portalLabelSize = hudFont.MeasureString(portalLabel);
-                Vector2 portalLabelPos = new Vector2(portalRect.X + (portalRect.Width - portalLabelSize.X) / 2f, portalRect.Y - portalLabelSize.Y - 10f);
-                // Draw text shadow for visibility
-                spriteBatch.DrawString(hudFont, portalLabel, portalLabelPos + new Vector2(2, 2), Color.Black);
-                spriteBatch.DrawString(hudFont, portalLabel, portalLabelPos, new Color(255, 255, 0)); // Bright yellow
-                
-                // Draw arrows pointing to portal
-                string arrow = ">>>>";
-                Vector2 arrowSize = hudFont.MeasureString(arrow);
-                Vector2 leftArrowPos = new Vector2(portalRect.Left - arrowSize.X - 10, portalRect.Center.Y - arrowSize.Y / 2);
-                spriteBatch.DrawString(hudFont, arrow, leftArrowPos, new Color(255, 255, 0));
             }
 
             // Draw the player.
@@ -749,10 +729,6 @@ namespace ProjectZeus.Core
             Vector2 titlePos = new Vector2((baseScreenSize.X - titleSize.X) / 2f, 40f);
             spriteBatch.DrawString(hudFont, title, titlePos, Color.Yellow);
 
-            string instructions = "Walk into the BRIGHT PURPLE PORTAL on the right!";
-            Vector2 instrSize = hudFont.MeasureString(instructions);
-            Vector2 instrPos = new Vector2((baseScreenSize.X - instrSize.X) / 2f, 70f);
-            spriteBatch.DrawString(hudFont, instructions, instrPos, new Color(255, 100, 255));
 
             if (hasCollectedMineItem)
             {
