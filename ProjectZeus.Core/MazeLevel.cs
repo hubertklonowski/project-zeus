@@ -246,6 +246,10 @@ namespace ProjectZeus.Core
                 }
             }
             
+            // Clamp player position to window bounds to prevent going off-screen
+            playerPosition.X = Math.Max(0, Math.Min(baseScreenSize.X - playerSize.X, playerPosition.X));
+            playerPosition.Y = Math.Max(0, Math.Min(baseScreenSize.Y - playerSize.Y, playerPosition.Y));
+            
             // Update minotaur
             UpdateMinotaur(dt);
             
@@ -355,6 +359,10 @@ namespace ProjectZeus.Core
                 }
             }
             
+            // Clamp minotaur position to window bounds
+            minotaurPosition.X = Math.Max(0, Math.Min(baseScreenSize.X - minotaurSize.X, minotaurPosition.X));
+            minotaurPosition.Y = Math.Max(0, Math.Min(baseScreenSize.Y - minotaurSize.Y, minotaurPosition.Y));
+            
             // Check collision with player
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y,
                                                  (int)playerSize.X, (int)playerSize.Y);
@@ -370,9 +378,12 @@ namespace ProjectZeus.Core
                 
                 Vector2 pushedPosition = playerPosition + pushDir * 50f * dt;
                 
-                // Only apply push if it doesn't push player into a wall
+                // Only apply push if it doesn't push player into a wall or off-screen
                 if (!CheckWallCollision(pushedPosition, playerSize))
                 {
+                    // Also check window bounds
+                    pushedPosition.X = Math.Max(0, Math.Min(baseScreenSize.X - playerSize.X, pushedPosition.X));
+                    pushedPosition.Y = Math.Max(0, Math.Min(baseScreenSize.Y - playerSize.Y, pushedPosition.Y));
                     playerPosition = pushedPosition;
                 }
             }
