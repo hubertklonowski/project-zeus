@@ -79,6 +79,11 @@ namespace ProjectZeus.Core
         private Vector2 portalPosition;
         private Vector2 portalSize = new Vector2(60, 80);
         private Texture2D portalTexture;
+        private readonly Color portalBaseColor = new Color(100, 50, 200);
+        private const float portalMarginFromEdge = 100f;
+        private const float portalPulseFrequency = 3f;
+        private const float portalPulseAmplitude = 0.3f;
+        private const float portalPulseOffset = 0.7f;
 
         public PlatformerGame()
         {
@@ -135,7 +140,7 @@ namespace ProjectZeus.Core
             slotTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(200, 200, 255));
             skyTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(135, 206, 235));
             playerTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(255, 220, 180));
-            portalTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(100, 50, 200)); // Purple portal
+            portalTexture = CreateSolidTexture(GraphicsDevice, 1, 1, portalBaseColor);
 
             // Set up three pillars across the base screen, starting from the bottom.
             float centerX = baseScreenSize.X / 2f;
@@ -164,7 +169,7 @@ namespace ProjectZeus.Core
             isOnGround = true;
             
             // Place portal on the right side of the screen
-            portalPosition = new Vector2(baseScreenSize.X - 100f, groundTop - portalSize.Y);
+            portalPosition = new Vector2(baseScreenSize.X - portalMarginFromEdge, groundTop - portalSize.Y);
 
             inZeusFightScene = false;
             zeusFightScene = new ZeusFightScene();
@@ -539,10 +544,10 @@ namespace ProjectZeus.Core
                 
                 // Animated portal effect using time
                 float portalTime = (float)gameTime.TotalGameTime.TotalSeconds;
-                float pulse = (float)(Math.Sin(portalTime * 3) * 0.3 + 0.7); // Pulsing effect
+                float pulse = (float)(Math.Sin(portalTime * portalPulseFrequency) * portalPulseAmplitude + portalPulseOffset);
                 
                 // Draw portal base
-                spriteBatch.Draw(portalTexture, portalRect, new Color(100, 50, 200) * pulse);
+                spriteBatch.Draw(portalTexture, portalRect, portalBaseColor * pulse);
                 
                 // Draw portal inner glow
                 Rectangle innerRect = portalRect;
