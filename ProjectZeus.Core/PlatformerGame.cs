@@ -68,6 +68,9 @@ namespace ProjectZeus.Core
         // Scene management.
         private bool inZeusFightScene;
         private ZeusFightScene zeusFightScene;
+        private bool inMineLevel;
+        private Platformer2D.Level mineLevel;
+        private Platformer2D.PillarItem collectedItem;
 
         public PlatformerGame()
         {
@@ -154,6 +157,10 @@ namespace ProjectZeus.Core
             inZeusFightScene = false;
             zeusFightScene = new ZeusFightScene();
             zeusFightScene.LoadContent(GraphicsDevice, hudFont);
+
+            inMineLevel = false;
+            collectedItem = null;
+            // Mine level will be loaded on demand when entering it
         }
 
         public void ScalePresentationArea()
@@ -169,6 +176,22 @@ namespace ProjectZeus.Core
 
         }
 
+        private void LoadMineLevel()
+        {
+            // Unload previous level if any
+            if (mineLevel != null)
+                mineLevel.Dispose();
+
+            // Load level 3 (the mine level)
+            string levelPath = "Content/Levels/3.txt";
+            using (Stream fileStream = TitleContainer.OpenStream(levelPath))
+            {
+                mineLevel = new Platformer2D.Level(Services, fileStream, 3);
+            }
+
+            inMineLevel = true;
+        }
+
         /// <summary>
         /// Allows the game to run logic such as updating the world,
         /// checking for collisions, gathering input, and playing audio.
@@ -179,6 +202,13 @@ namespace ProjectZeus.Core
             if (inZeusFightScene)
             {
                 zeusFightScene.Update(gameTime);
+                base.Update(gameTime);
+                return;
+            }
+
+            if (inMineLevel)
+            {
+                UpdateMineLevel(gameTime);
                 base.Update(gameTime);
                 return;
             }
@@ -257,8 +287,15 @@ namespace ProjectZeus.Core
             if (playerPosition.X + playerSize.X > baseScreenSize.X)
                 playerPosition.X = baseScreenSize.X - playerSize.X;
 
-            // Interaction: press E near a pillar to insert an item (toggle for now).
-            if (keyboardState.IsKeyDown(Keys.E))
+            // Press M to enter the mine level
+            if (keyboardState.IsKeyDown(Keys.M) && !inMineLevel)
+            {
+                LoadMineLevel();
+                return; // Exit this update, next frame will use mine level update
+            }
+
+            // Interaction: press E near a pillar to insert an item (if we have one).
+            if (keyboardState.IsKeyDown(Keys.E) && collectedItem != null)
             {
                 TryInsertItemAtPlayer();
             }
@@ -294,13 +331,17 @@ namespace ProjectZeus.Core
 
         private void TryInsertItemAtPlayer()
         {
-            if (pillars == null || pillarHasItem == null)
+            if (pillars == null || pillarHasItem == null || collectedItem == null)
                 return;
 
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
 
             for (int i = 0; i < pillars.Length; i++)
             {
+                // Skip if this pillar already has an item
+                if (pillarHasItem[i])
+                    continue;
+
                 Rectangle slotRect = pillars[i].GetSlotRectangle();
 
                 // Define a small interaction zone around the slot.
@@ -309,9 +350,52 @@ namespace ProjectZeus.Core
 
                 if (playerRect.Intersects(interactionRect))
                 {
-                    pillarHasItem[i] = true; // simple: once inserted, stays there
+                    pillarHasItem[i] = true; // Insert the item
+                    collectedItem = null; // Item has been placed
                     break;
                 }
+            }
+        }
+
+        private void UpdateMineLevel(GameTime gameTime)
+        {
+            // Handle polling for our input
+            HandleInput(gameTime);
+
+            if (mineLevel == null)
+                return;
+
+            // Update the mine level
+            mineLevel.Update(gameTime, keyboardState, gamePadState, AccelerometerState.Default, DisplayOrientation.LandscapeLeft);
+
+            // Check if player presses E to collect an item
+            if (keyboardState.IsKeyDown(Keys.E) && collectedItem == null)
+            {
+                collectedItem = mineLevel.TryCollectPillarItem(mineLevel.Player.BoundingRectangle);
+            }
+
+            // Check if player reached the exit - return to pillar room
+            if (mineLevel.ReachedExit)
+            {
+                inMineLevel = false;
+                if (mineLevel != null)
+                {
+                    mineLevel.Dispose();
+                    mineLevel = null;
+                }
+                // Return player to pillar room
+                float groundTop = baseScreenSize.Y - 20f;
+                float centerX = baseScreenSize.X / 2f;
+                float spacing = 200f;
+                playerPosition = new Vector2(centerX - spacing - 80f, groundTop - playerSize.Y);
+                playerVelocity = Vector2.Zero;
+                isOnGround = true;
+            }
+
+            // Allow player to restart if they die
+            if (!mineLevel.Player.IsAlive && mineLevel.TimeRemaining > TimeSpan.Zero)
+            {
+                mineLevel.StartNewLife();
             }
         }
 
@@ -321,6 +405,35 @@ namespace ProjectZeus.Core
             {
                 // Let the Zeus fight scene draw its background and the player.
                 zeusFightScene.Draw(spriteBatch, GraphicsDevice, playerTexture, playerPosition, playerSize);
+                base.Draw(gameTime);
+                return;
+            }
+
+            if (inMineLevel && mineLevel != null)
+            {
+                // Draw the mine level
+                graphics.GraphicsDevice.Clear(Color.Black);
+
+                spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, globalTransformation);
+
+                mineLevel.Draw(gameTime, spriteBatch);
+
+                // Draw UI overlay for the mine level
+                string instructions = "Press E to collect items";
+                Vector2 instructionsSize = hudFont.MeasureString(instructions);
+                Vector2 instructionsPos = new Vector2((baseScreenSize.X - instructionsSize.X) / 2f, 10f);
+                spriteBatch.DrawString(hudFont, instructions, instructionsPos, Color.Yellow);
+
+                if (collectedItem != null)
+                {
+                    string hasItem = "Item collected! Return to exit.";
+                    Vector2 hasItemSize = hudFont.MeasureString(hasItem);
+                    Vector2 hasItemPos = new Vector2((baseScreenSize.X - hasItemSize.X) / 2f, 35f);
+                    spriteBatch.DrawString(hudFont, hasItem, hasItemPos, Color.LightGreen);
+                }
+
+                spriteBatch.End();
+
                 base.Draw(gameTime);
                 return;
             }
@@ -462,6 +575,19 @@ namespace ProjectZeus.Core
             Vector2 titleSize = hudFont.MeasureString(title);
             Vector2 titlePos = new Vector2((baseScreenSize.X - titleSize.X) / 2f, 40f);
             spriteBatch.DrawString(hudFont, title, titlePos, Color.Yellow);
+
+            string instructions = "Press M to enter the Mine Level";
+            Vector2 instrSize = hudFont.MeasureString(instructions);
+            Vector2 instrPos = new Vector2((baseScreenSize.X - instrSize.X) / 2f, 70f);
+            spriteBatch.DrawString(hudFont, instructions, instrPos, Color.White);
+
+            if (collectedItem != null)
+            {
+                string hasItem = "Press E near a pillar to place the item";
+                Vector2 hasItemSize = hudFont.MeasureString(hasItem);
+                Vector2 hasItemPos = new Vector2((baseScreenSize.X - hasItemSize.X) / 2f, 100f);
+                spriteBatch.DrawString(hudFont, hasItem, hasItemPos, Color.LightGreen);
+            }
         }
 
         private void DrawRectangleOutline(Rectangle rect, Color color)
