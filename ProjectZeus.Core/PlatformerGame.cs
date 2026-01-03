@@ -716,11 +716,6 @@ namespace ProjectZeus.Core
                 spriteBatch.Draw(playerTexture, minePlayerRect, Color.White);
 
                 // Draw UI
-                string instructions = "Arrow Keys/WASD: Move | Space: Jump | E: Collect Item";
-                Vector2 instructionsSize = hudFont.MeasureString(instructions);
-                Vector2 instructionsPos = new Vector2((baseScreenSize.X - instructionsSize.X) / 2f, 10f);
-                spriteBatch.DrawString(hudFont, instructions, instructionsPos, Color.Yellow);
-
                 if (mineItemCollected)
                 {
                     string hasItem = "Item collected! Go to green exit portal!";
