@@ -78,6 +78,14 @@ namespace ProjectZeus.Core
         private Platformer2D.Level mineLevel;
         private Platformer2D.PillarItem collectedItem;
 
+        // Portal animation constants
+        private const int PORTAL_OUTER_RED = 100;
+        private const int PORTAL_OUTER_GREEN = 50;
+        private const int PORTAL_OUTER_BLUE = 200;
+        private const int PORTAL_INNER_RED = 150;
+        private const int PORTAL_INNER_GREEN = 100;
+        private const int PORTAL_INNER_BLUE = 255;
+
         public PlatformerGame()
         {
             graphics = new GraphicsDeviceManager(this);
@@ -602,8 +610,8 @@ namespace ProjectZeus.Core
             {
                 // Animated portal effect - pulsing colors
                 float pulse = (float)Math.Sin(portalAnimationTime * 3.0f) * 0.3f + 0.7f;
-                Color portalColor1 = new Color((byte)(100 * pulse), (byte)(50 * pulse), (byte)(200 * pulse));
-                Color portalColor2 = new Color((byte)(150 * pulse), (byte)(100 * pulse), (byte)(255 * pulse));
+                Color portalColor1 = new Color((byte)(PORTAL_OUTER_RED * pulse), (byte)(PORTAL_OUTER_GREEN * pulse), (byte)(PORTAL_OUTER_BLUE * pulse));
+                Color portalColor2 = new Color((byte)(PORTAL_INNER_RED * pulse), (byte)(PORTAL_INNER_GREEN * pulse), (byte)(PORTAL_INNER_BLUE * pulse));
 
                 // Draw portal frame
                 spriteBatch.Draw(portalTexture, portalRect, portalColor1);
