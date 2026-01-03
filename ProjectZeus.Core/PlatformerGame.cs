@@ -8,6 +8,7 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
@@ -75,16 +76,26 @@ namespace ProjectZeus.Core
         private bool inZeusFightScene;
         private ZeusFightScene zeusFightScene;
         private bool inMineLevel;
-        private Platformer2D.Level mineLevel;
-        private Platformer2D.PillarItem collectedItem;
+        private Platformer2D.PillarItem mineLevelItem;
+        
+        // Mine level simple scene (no Level.cs, using simple shapes)
+        private Vector2 minePlayerPosition;
+        private Vector2 minePlayerVelocity;
+        private bool minePlayerOnGround;
+        private List<Rectangle> minePlatforms;
+        private Rectangle mineExitRect;
+        private Rectangle mineItemRect;
+        private bool mineItemCollected;
+        private Texture2D minePlatformTexture;
+        private Texture2D mineBackgroundTexture;
 
         // Portal animation constants
-        private const int PORTAL_OUTER_RED = 100;
-        private const int PORTAL_OUTER_GREEN = 50;
-        private const int PORTAL_OUTER_BLUE = 200;
-        private const int PORTAL_INNER_RED = 150;
-        private const int PORTAL_INNER_GREEN = 100;
-        private const int PORTAL_INNER_BLUE = 255;
+        private const int PORTAL_OUTER_RED = 255;
+        private const int PORTAL_OUTER_GREEN = 100;
+        private const int PORTAL_OUTER_BLUE = 255;
+        private const int PORTAL_INNER_RED = 200;
+        private const int PORTAL_INNER_GREEN = 50;
+        private const int PORTAL_INNER_BLUE = 200;
 
         public PlatformerGame()
         {
@@ -168,22 +179,40 @@ namespace ProjectZeus.Core
             playerVelocity = Vector2.Zero;
             isOnGround = true;
 
-            // Create portal to mine level (on the right side of the screen)
+            // Create portal to mine level (on the right side of the screen) - make it BIG and VISIBLE
             portalTexture = CreateSolidTexture(GraphicsDevice, 1, 1, Color.White);
-            float portalWidth = 60f;
-            float portalHeight = 80f;
-            float portalX = baseScreenSize.X - portalWidth - 100f;
+            float portalWidth = 100f;  // Much larger
+            float portalHeight = 140f;  // Much taller
+            float portalX = baseScreenSize.X - portalWidth - 50f;  // Closer to edge
             float portalY = groundTop - portalHeight;
             portalRect = new Rectangle((int)portalX, (int)portalY, (int)portalWidth, (int)portalHeight);
             portalAnimationTime = 0f;
+
+            // Initialize mine level simple scene
+            minePlatforms = new List<Rectangle>();
+            mineItemCollected = false;
+            minePlatformTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(100, 100, 100));
+            mineBackgroundTexture = CreateSolidTexture(GraphicsDevice, 1, 1, new Color(20, 15, 30));
+            
+            // Create simple mine platforms
+            minePlatforms.Add(new Rectangle(0, (int)(baseScreenSize.Y - 20), (int)baseScreenSize.X, 20)); // Ground
+            minePlatforms.Add(new Rectangle(50, (int)(baseScreenSize.Y - 120), 150, 20)); // Platform 1
+            minePlatforms.Add(new Rectangle(300, (int)(baseScreenSize.Y - 200), 150, 20)); // Platform 2
+            minePlatforms.Add(new Rectangle(550, (int)(baseScreenSize.Y - 120), 200, 20)); // Platform 3 (exit platform)
+            
+            // Mine exit (portal back)
+            mineExitRect = new Rectangle(650, (int)(baseScreenSize.Y - 180), 60, 60);
+            
+            // Mine item to collect
+            mineItemRect = new Rectangle(130, (int)(baseScreenSize.Y - 160), 30, 30);
 
             inZeusFightScene = false;
             zeusFightScene = new ZeusFightScene();
             zeusFightScene.LoadContent(GraphicsDevice, hudFont);
 
             inMineLevel = false;
-            collectedItem = null;
-            // Mine level will be loaded on demand when entering it
+            mineLevelItem = null;
+            // Mine level will use simple shapes, no text file needed
         }
 
         public void ScalePresentationArea()
@@ -201,18 +230,12 @@ namespace ProjectZeus.Core
 
         private void LoadMineLevel()
         {
-            // Unload previous level if any
-            if (mineLevel != null)
-                mineLevel.Dispose();
-
-            // Load level 3 (the mine level)
-            string levelPath = "Content/Levels/3.txt";
-            using (Stream fileStream = TitleContainer.OpenStream(levelPath))
-            {
-                mineLevel = new Platformer2D.Level(Services, fileStream, 3);
-            }
-
+            // Simple mine level - just reset player position and flags
             inMineLevel = true;
+            mineItemCollected = false;
+            minePlayerPosition = new Vector2(50f, baseScreenSize.Y - playerSize.Y - 30f);
+            minePlayerVelocity = Vector2.Zero;
+            minePlayerOnGround = false;
         }
 
         /// <summary>
@@ -313,7 +336,7 @@ namespace ProjectZeus.Core
             // Update portal animation
             portalAnimationTime += (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-            // Check if player enters the portal to the mine level
+            // Check if player enters the portal to the mine level (ONLY WAY TO ENTER)
             Rectangle playerRect2 = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
             if (playerRect2.Intersects(portalRect) && !inMineLevel)
             {
@@ -321,15 +344,8 @@ namespace ProjectZeus.Core
                 return; // Exit this update, next frame will use mine level update
             }
 
-            // Press M to enter the mine level (keep as backup option)
-            if (keyboardState.IsKeyDown(Keys.M) && !previousKeyboardState.IsKeyDown(Keys.M) && !inMineLevel)
-            {
-                LoadMineLevel();
-                return; // Exit this update, next frame will use mine level update
-            }
-
             // Interaction: press E near a pillar to insert an item (if we have one).
-            if (keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E) && collectedItem != null)
+            if (keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E) && mineLevelItem != null)
             {
                 TryInsertItemAtPlayer();
             }
@@ -386,7 +402,7 @@ namespace ProjectZeus.Core
                 if (playerRect.Intersects(interactionRect))
                 {
                     pillarHasItem[i] = true; // Insert the item
-                    collectedItem = null; // Item has been placed
+                    mineLevelItem = null; // Item has been placed
                     break;
                 }
             }
@@ -397,40 +413,89 @@ namespace ProjectZeus.Core
             // Handle polling for our input
             HandleInput(gameTime);
 
-            if (mineLevel == null)
-                return;
+            // Simple platformer physics for mine level
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            float moveSpeed = 180f;
+            float jumpVelocity = -560f;
+            float gravity = 900f;
 
-            // Update the mine level
-            mineLevel.Update(gameTime, keyboardState, gamePadState, new AccelerometerState(Vector3.Zero, false), DisplayOrientation.LandscapeLeft);
+            // Movement
+            float move = 0f;
+            if (keyboardState.IsKeyDown(Keys.Left) || keyboardState.IsKeyDown(Keys.A))
+                move -= 1f;
+            if (keyboardState.IsKeyDown(Keys.Right) || keyboardState.IsKeyDown(Keys.D))
+                move += 1f;
 
-            // Check if player presses E to collect an item
-            if (keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E) && collectedItem == null)
+            minePlayerVelocity.X = move * moveSpeed;
+
+            // Jumping
+            if (minePlayerOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up)))
             {
-                collectedItem = mineLevel.TryCollectPillarItem(mineLevel.Player.BoundingRectangle);
+                minePlayerVelocity.Y = jumpVelocity;
+                minePlayerOnGround = false;
             }
 
-            // Check if player reached the exit - return to pillar room
-            if (mineLevel.ReachedExit)
+            // Gravity
+            minePlayerVelocity.Y += gravity * dt;
+            minePlayerPosition += minePlayerVelocity * dt;
+
+            // Collision with platforms
+            minePlayerOnGround = false;
+            Rectangle playerRect = new Rectangle((int)minePlayerPosition.X, (int)minePlayerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
+            
+            foreach (Rectangle platform in minePlatforms)
             {
-                inMineLevel = false;
-                if (mineLevel != null)
+                if (playerRect.Bottom > platform.Top &&
+                    playerRect.Bottom <= platform.Top + 20 &&
+                    playerRect.Right > platform.Left &&
+                    playerRect.Left < platform.Right &&
+                    minePlayerVelocity.Y >= 0)
                 {
-                    mineLevel.Dispose();
-                    mineLevel = null;
+                    minePlayerPosition.Y = platform.Top - playerSize.Y;
+                    minePlayerVelocity.Y = 0f;
+                    minePlayerOnGround = true;
+                    playerRect.Y = (int)minePlayerPosition.Y;
                 }
-                // Return player to pillar room
+            }
+
+            // Prevent leaving screen
+            if (minePlayerPosition.X < 0)
+                minePlayerPosition.X = 0;
+            if (minePlayerPosition.X + playerSize.X > baseScreenSize.X)
+                minePlayerPosition.X = baseScreenSize.X - playerSize.X;
+
+            // Check if player collects the item
+            if (!mineItemCollected && keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E))
+            {
+                playerRect = new Rectangle((int)minePlayerPosition.X, (int)minePlayerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
+                if (playerRect.Intersects(mineItemRect))
+                {
+                    mineItemCollected = true;
+                    // Create a simple pillar item (we don't need the full PillarItem class)
+                    mineLevelItem = new Platformer2D.PillarItem(null, Vector2.Zero, Color.Gold);
+                }
+            }
+
+            // Check if player reaches exit portal
+            playerRect = new Rectangle((int)minePlayerPosition.X, (int)minePlayerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
+            if (playerRect.Intersects(mineExitRect))
+            {
+                // Return to pillar room
+                inMineLevel = false;
                 float groundTop = baseScreenSize.Y - 20f;
                 float centerX = baseScreenSize.X / 2f;
                 float spacing = 200f;
                 playerPosition = new Vector2(centerX - spacing - 80f, groundTop - playerSize.Y);
                 playerVelocity = Vector2.Zero;
                 isOnGround = true;
+                // Keep the collected item if we got it
             }
 
-            // Allow player to restart if they die
-            if (!mineLevel.Player.IsAlive && mineLevel.TimeRemaining > TimeSpan.Zero)
+            // Reset if player falls off
+            if (minePlayerPosition.Y > baseScreenSize.Y)
             {
-                mineLevel.StartNewLife();
+                minePlayerPosition = new Vector2(50f, baseScreenSize.Y - playerSize.Y - 30f);
+                minePlayerVelocity = Vector2.Zero;
             }
         }
 
@@ -444,26 +509,52 @@ namespace ProjectZeus.Core
                 return;
             }
 
-            if (inMineLevel && mineLevel != null)
+            if (inMineLevel)
             {
-                // Draw the mine level
-                graphics.GraphicsDevice.Clear(Color.Black);
+                // Draw the simple mine level
+                graphics.GraphicsDevice.Clear(new Color(20, 15, 30)); // Dark cave background
 
                 spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, globalTransformation);
 
-                mineLevel.Draw(gameTime, spriteBatch);
+                // Draw background
+                Rectangle bgRect = new Rectangle(0, 0, (int)baseScreenSize.X, (int)baseScreenSize.Y);
+                spriteBatch.Draw(mineBackgroundTexture, bgRect, Color.White);
 
-                // Draw UI overlay for the mine level
-                string instructions = "Press E to collect items";
+                // Draw platforms
+                foreach (Rectangle platform in minePlatforms)
+                {
+                    spriteBatch.Draw(minePlatformTexture, platform, new Color(80, 70, 60));
+                }
+
+                // Draw item if not collected
+                if (!mineItemCollected)
+                {
+                    spriteBatch.Draw(playerTexture, mineItemRect, Color.Gold);
+                    // Draw item glow
+                    Rectangle glowRect = mineItemRect;
+                    glowRect.Inflate(5, 5);
+                    spriteBatch.Draw(playerTexture, glowRect, new Color(255, 215, 0, 100));
+                }
+
+                // Draw exit portal
+                float exitPulse = (float)Math.Sin(portalAnimationTime * 4.0f) * 0.3f + 0.7f;
+                spriteBatch.Draw(playerTexture, mineExitRect, new Color((byte)(100 * exitPulse), (byte)(255 * exitPulse), (byte)(100 * exitPulse)));
+                
+                // Draw player in mine
+                Rectangle minePlayerRect = new Rectangle((int)minePlayerPosition.X, (int)minePlayerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
+                spriteBatch.Draw(playerTexture, minePlayerRect, Color.White);
+
+                // Draw UI
+                string instructions = "Arrow Keys/WASD: Move | Space: Jump | E: Collect Item";
                 Vector2 instructionsSize = hudFont.MeasureString(instructions);
                 Vector2 instructionsPos = new Vector2((baseScreenSize.X - instructionsSize.X) / 2f, 10f);
                 spriteBatch.DrawString(hudFont, instructions, instructionsPos, Color.Yellow);
 
-                if (collectedItem != null)
+                if (mineItemCollected)
                 {
-                    string hasItem = "Item collected! Return to exit.";
+                    string hasItem = "Item collected! Go to green exit portal!";
                     Vector2 hasItemSize = hudFont.MeasureString(hasItem);
-                    Vector2 hasItemPos = new Vector2((baseScreenSize.X - hasItemSize.X) / 2f, 35f);
+                    Vector2 hasItemPos = new Vector2((baseScreenSize.X - hasItemSize.X) / 2f, 40f);
                     spriteBatch.DrawString(hudFont, hasItem, hasItemPos, Color.LightGreen);
                 }
 
@@ -605,15 +696,23 @@ namespace ProjectZeus.Core
                 }
             }
 
-            // Draw the portal with animation
+            // Draw the portal with BRIGHT, VERY VISIBLE animation
             if (portalTexture != null)
             {
-                // Animated portal effect - pulsing colors
+                // Animated portal effect - BRIGHT pulsing colors
                 float pulse = (float)Math.Sin(portalAnimationTime * 3.0f) * 0.3f + 0.7f;
-                Color portalColor1 = new Color((byte)(PORTAL_OUTER_RED * pulse), (byte)(PORTAL_OUTER_GREEN * pulse), (byte)(PORTAL_OUTER_BLUE * pulse));
-                Color portalColor2 = new Color((byte)(PORTAL_INNER_RED * pulse), (byte)(PORTAL_INNER_GREEN * pulse), (byte)(PORTAL_INNER_BLUE * pulse));
+                float fastPulse = (float)Math.Sin(portalAnimationTime * 6.0f) * 0.5f + 0.5f;
+                
+                // Very bright magenta/purple portal
+                Color portalColor1 = new Color((byte)(255 * pulse), (byte)(100 * pulse), (byte)(255 * pulse));
+                Color portalColor2 = new Color((byte)(200 * fastPulse), (byte)(50 * fastPulse), (byte)(255 * fastPulse));
 
-                // Draw portal frame
+                // Draw outer glow for visibility
+                Rectangle glowRect = portalRect;
+                glowRect.Inflate(15, 15);
+                spriteBatch.Draw(portalTexture, glowRect, new Color((byte)(255 * fastPulse), (byte)(100 * fastPulse), (byte)(255 * fastPulse), (byte)100));
+
+                // Draw portal frame - BRIGHT
                 spriteBatch.Draw(portalTexture, portalRect, portalColor1);
                 
                 // Draw inner portal with different color
@@ -621,14 +720,25 @@ namespace ProjectZeus.Core
                 innerPortal.Inflate(-8, -8);
                 spriteBatch.Draw(portalTexture, innerPortal, portalColor2);
 
-                // Draw portal outline
-                DrawRectangleOutline(portalRect, Color.Purple);
+                // Draw portal outline - THICK and BRIGHT
+                DrawRectangleOutline(portalRect, new Color(255, 0, 255)); // Bright magenta
+                Rectangle thickOutline = portalRect;
+                thickOutline.Inflate(3, 3);
+                DrawRectangleOutline(thickOutline, new Color(200, 0, 200));
 
-                // Draw "MINE" text above portal
-                string portalLabel = "MINE";
+                // Draw "MINE LEVEL" text above portal - LARGE and BRIGHT
+                string portalLabel = ">>> MINE <<<";
                 Vector2 portalLabelSize = hudFont.MeasureString(portalLabel);
-                Vector2 portalLabelPos = new Vector2(portalRect.X + (portalRect.Width - portalLabelSize.X) / 2f, portalRect.Y - portalLabelSize.Y - 5f);
-                spriteBatch.DrawString(hudFont, portalLabel, portalLabelPos, Color.White);
+                Vector2 portalLabelPos = new Vector2(portalRect.X + (portalRect.Width - portalLabelSize.X) / 2f, portalRect.Y - portalLabelSize.Y - 10f);
+                // Draw text shadow for visibility
+                spriteBatch.DrawString(hudFont, portalLabel, portalLabelPos + new Vector2(2, 2), Color.Black);
+                spriteBatch.DrawString(hudFont, portalLabel, portalLabelPos, new Color(255, 255, 0)); // Bright yellow
+                
+                // Draw arrows pointing to portal
+                string arrow = ">>>>";
+                Vector2 arrowSize = hudFont.MeasureString(arrow);
+                Vector2 leftArrowPos = new Vector2(portalRect.Left - arrowSize.X - 10, portalRect.Center.Y - arrowSize.Y / 2);
+                spriteBatch.DrawString(hudFont, arrow, leftArrowPos, new Color(255, 255, 0));
             }
 
             // Draw the player.
@@ -640,12 +750,12 @@ namespace ProjectZeus.Core
             Vector2 titlePos = new Vector2((baseScreenSize.X - titleSize.X) / 2f, 40f);
             spriteBatch.DrawString(hudFont, title, titlePos, Color.Yellow);
 
-            string instructions = "Enter the portal to go to the Mine Level";
+            string instructions = "Walk into the BRIGHT PURPLE PORTAL on the right!";
             Vector2 instrSize = hudFont.MeasureString(instructions);
             Vector2 instrPos = new Vector2((baseScreenSize.X - instrSize.X) / 2f, 70f);
-            spriteBatch.DrawString(hudFont, instructions, instrPos, Color.White);
+            spriteBatch.DrawString(hudFont, instructions, instrPos, new Color(255, 100, 255));
 
-            if (collectedItem != null)
+            if (mineLevelItem != null)
             {
                 string hasItem = "Press E near a pillar to place the item";
                 Vector2 hasItemSize = hudFont.MeasureString(hasItem);
