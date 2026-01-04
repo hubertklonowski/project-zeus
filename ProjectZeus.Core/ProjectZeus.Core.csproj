@@ -31,6 +31,9 @@
     <None Update="Content\Sprites\minotaur.aseprite">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="Content\Sprites\sandtile.aseprite">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Content\Sprites\vase.aseprite">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
