@@ -46,16 +46,14 @@ namespace ProjectZeus.Core.Rendering
                         var frameSprite = sprite.asepriteFile.CreateSprite(graphicsDevice, i, 
                             onlyVisibleLayers: true, includeBackgroundLayer: false, includeTilemapLayers: false);
                         sprite.frameTextures[i] = frameSprite.TextureRegion.Texture;
-                    }
-                    
-                    // Get size from first frame
-                    if (sprite.FrameCount > 0)
-                    {
-                        var firstSprite = sprite.asepriteFile.CreateSprite(graphicsDevice, 0, 
-                            onlyVisibleLayers: true, includeBackgroundLayer: false, includeTilemapLayers: false);
-                        sprite.Size = new Vector2(
-                            firstSprite.TextureRegion.Bounds.Width, 
-                            firstSprite.TextureRegion.Bounds.Height);
+                        
+                        // Get size from first frame
+                        if (i == 0)
+                        {
+                            sprite.Size = new Vector2(
+                                frameSprite.TextureRegion.Bounds.Width, 
+                                frameSprite.TextureRegion.Bounds.Height);
+                        }
                     }
                     
                     sprite.IsLoaded = true;

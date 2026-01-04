@@ -63,12 +63,8 @@ namespace ProjectZeus.Core.Levels
             backgroundTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(20, 15, 30));
             
             // Load sprites for bat and cart
-            var batSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/bat.aseprite");
-            var cartSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/cart.aseprite");
-            
-            // Store sprites for later assignment to entities
-            this.batSprite = batSprite;
-            this.cartSprite = cartSprite;
+            batSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/bat.aseprite");
+            cartSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/cart.aseprite");
         }
 
         public void Enter()
