@@ -1,6 +1,10 @@
 using System;
+using System.IO;
+using AsepriteDotNet.Aseprite;
+using AsepriteDotNet.IO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using MonoGame.Aseprite;
 using ProjectZeus.Core.Constants;
 
 namespace ProjectZeus.Core.Entities
@@ -9,16 +13,12 @@ namespace ProjectZeus.Core.Entities
     /// Animated player character using Adonis Aseprite sprite
     /// Frame 0: Standing idle
     /// Frames 1-7: Walking animation
-    /// 
-    /// NOTE: This class requires 'Content/Sprites/adonis.aseprite' file to be present.
-    /// The file should contain 8 frames (0=idle, 1-7=walking animation).
     /// </summary>
     public class AdonisPlayer
     {
         private Texture2D adonisTexture;
+        private AsepriteFile adonisFile;
         private int frameCount = 8;
-        private int frameWidth;
-        private int frameHeight;
         private SpriteEffects flip = SpriteEffects.None;
         private bool isLoaded = false;
 
@@ -44,28 +44,22 @@ namespace ProjectZeus.Core.Entities
         {
             try
             {
-                // Try to load from Aseprite file when MonoGame.Aseprite API is available
-                // For now, using placeholder logic
-                // TODO: Implement proper Aseprite loading when file is available
-                //using (var stream = TitleContainer.OpenStream("Content/Sprites/adonis.aseprite"))
-                //{
-                //    adonisFile = AsepriteFileLoader.FromStream("adonis", stream, preMultiplyAlpha: true);
-                //    adonisTexture = adonisFile.CreateTexture(graphicsDevice);
-                //}
+                // Load the aseprite file
+                using (var stream = TitleContainer.OpenStream("Content/Sprites/adonis.aseprite"))
+                {
+                    adonisFile = AsepriteFileLoader.FromStream("adonis", stream);
+                    var sprite = adonisFile.CreateSprite(graphicsDevice, frameIndex: 0, onlyVisibleLayers: true, includeBackgroundLayer: false, includeTilemapLayers: false);
+                    adonisTexture = sprite.TextureRegion.Texture;
+                    frameCount = adonisFile.Frames.Length;
+                }
                 
-                // Create a colored rectangle as placeholder
-                adonisTexture = CreatePlaceholderTexture(graphicsDevice);
-                frameWidth = 32;
-                frameHeight = 48;
                 isLoaded = true;
             }
             catch (Exception ex)
             {
-                // If file doesn't exist, create a simple placeholder
                 Console.WriteLine($"Could not load adonis.aseprite: {ex.Message}");
+                Console.WriteLine($"Stack: {ex.StackTrace}");
                 adonisTexture = CreatePlaceholderTexture(graphicsDevice);
-                frameWidth = 32;
-                frameHeight = 48;
                 isLoaded = true;
             }
         }
@@ -75,7 +69,7 @@ namespace ProjectZeus.Core.Entities
             var texture = new Texture2D(graphicsDevice, 32, 48);
             Color[] data = new Color[32 * 48];
             for (int i = 0; i < data.Length; i++)
-                data[i] = new Color(255, 220, 180); // Skin tone
+                data[i] = new Color(255, 220, 180);
             texture.SetData(data);
             return texture;
         }
@@ -90,11 +84,8 @@ namespace ProjectZeus.Core.Entities
             if (!isLoaded || adonisTexture == null)
                 return;
 
-            // For placeholder, just draw a simple rectangle
-            // When proper Aseprite file is loaded, this will show animated frames
+            // Calculate frame index based on movement
             int frameIndex = 0;
-
-            // Animate when moving
             if (Math.Abs(Velocity.X) > 10f)
             {
                 const float animationSpeed = 8f;
@@ -104,18 +95,33 @@ namespace ProjectZeus.Core.Entities
 
             frameIndex = Math.Clamp(frameIndex, 0, frameCount - 1);
 
-            // Placeholder: just draw the texture
-            // When Aseprite is loaded, this will select the correct frame
-            var sourceRect = new Rectangle(0, 0, frameWidth, frameHeight);
-            var origin = new Vector2(frameWidth / 2f, frameHeight);
-            var destPos = Position + new Vector2(Size.X / 2f, Size.Y);
+            if (adonisFile != null && frameIndex < frameCount)
+            {
+                // Create sprite for the current frame
+                var sprite = adonisFile.CreateSprite(spriteBatch.GraphicsDevice, frameIndex, onlyVisibleLayers: true, includeBackgroundLayer: false, includeTilemapLayers: false);
+                var sourceRect = sprite.TextureRegion.Bounds;
+                var origin = new Vector2(sourceRect.Width / 2f, sourceRect.Height);
+                var destPos = Position + new Vector2(Size.X / 2f, Size.Y);
 
-            // Flip sprite based on movement direction
-            flip = SpriteEffects.None;
-            if (Velocity.X < 0)
-                flip = SpriteEffects.FlipHorizontally;
+                flip = SpriteEffects.None;
+                if (Velocity.X < 0)
+                    flip = SpriteEffects.FlipHorizontally;
 
-            spriteBatch.Draw(adonisTexture, destPos, sourceRect, Color.White, 0f, origin, 1f, flip, 0f);
+                spriteBatch.Draw(sprite.TextureRegion.Texture, destPos, sourceRect, Color.White, 0f, origin, 1f, flip, 0f);
+            }
+            else
+            {
+                // Fallback
+                var sourceRect = new Rectangle(0, 0, 32, 48);
+                var origin = new Vector2(16f, 48f);
+                var destPos = Position + new Vector2(Size.X / 2f, Size.Y);
+
+                flip = SpriteEffects.None;
+                if (Velocity.X < 0)
+                    flip = SpriteEffects.FlipHorizontally;
+
+                spriteBatch.Draw(adonisTexture, destPos, sourceRect, Color.White, 0f, origin, 1f, flip, 0f);
+            }
         }
     }
 }

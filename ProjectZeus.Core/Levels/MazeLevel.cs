@@ -493,6 +493,10 @@ namespace ProjectZeus.Core
         {
             graphicsDevice.Clear(new Color(20, 20, 20));
             
+            // Sync player position and velocity to AdonisPlayer for rendering
+            player.Position = playerPosition;
+            player.Velocity = playerVelocity;
+            
             spriteBatch.Begin();
             
             int playerCellX = (int)((playerPosition.X + playerSize.X / 2) / cellSize);
