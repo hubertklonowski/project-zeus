@@ -392,7 +392,7 @@ namespace ProjectZeus.Core
                     break;
 
                 case GameScene.MountainLevel:
-                    mountainLevel.Draw(spriteBatch, GraphicsDevice);
+                    mountainLevel.Draw(spriteBatch, GraphicsDevice, gameTime);
                     spriteBatch.Begin();
                     player.Draw(gameTime, spriteBatch);
                     spriteBatch.End();

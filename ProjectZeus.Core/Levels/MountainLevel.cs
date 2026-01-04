@@ -1,6 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using AsepriteDotNet.Aseprite;
+using AsepriteDotNet.IO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using System.Collections.Generic;
+using MonoGame.Aseprite;
+using ProjectZeus.Core.Rendering;
 
 namespace ProjectZeus.Core
 {
@@ -12,8 +18,9 @@ namespace ProjectZeus.Core
     {
         private readonly Vector2 baseScreenSize = new Vector2(800, 480);
         
-        // Textures (simple placeholder colored rectangles)
+        // Textures
         private Texture2D solidTexture;
+        private AsepriteSprite goatSprite;
         private SpriteFont font;
         
         // Random number generator for rock throwing
@@ -67,6 +74,9 @@ namespace ProjectZeus.Core
             solidTexture.SetData(new[] { Color.White });
             
             this.font = font;
+            
+            // Load goat sprite
+            goatSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/goat.aseprite");
             
             // Build the mountain structure with platforms
             SetupMountain();
@@ -530,7 +540,7 @@ namespace ProjectZeus.Core
             return onPlatform;
         }
         
-        public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice)
+        public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, GameTime gameTime)
         {
             // Clear to sky blue
             graphicsDevice.Clear(new Color(135, 206, 235));
@@ -561,25 +571,43 @@ namespace ProjectZeus.Core
                 DrawRectangleOutline(spriteBatch, platformRect, new Color(80, 60, 40));
             }
             
-            // Draw goat (simple rectangle placeholder)
-            Rectangle goatRect = new Rectangle(
-                (int)goatPosition.X,
-                (int)goatPosition.Y,
-                (int)goatSize.X,
-                (int)goatSize.Y);
-            spriteBatch.Draw(solidTexture, goatRect, Color.White);
-            
-            // Draw simple goat face details
-            Rectangle goatEye1 = new Rectangle((int)goatPosition.X + 10, (int)goatPosition.Y + 10, 6, 6);
-            Rectangle goatEye2 = new Rectangle((int)goatPosition.X + 24, (int)goatPosition.Y + 10, 6, 6);
-            spriteBatch.Draw(solidTexture, goatEye1, Color.Black);
-            spriteBatch.Draw(solidTexture, goatEye2, Color.Black);
-            
-            // Draw horns
-            Rectangle horn1 = new Rectangle((int)goatPosition.X + 5, (int)goatPosition.Y - 5, 4, 8);
-            Rectangle horn2 = new Rectangle((int)goatPosition.X + 31, (int)goatPosition.Y - 5, 4, 8);
-            spriteBatch.Draw(solidTexture, horn1, new Color(220, 220, 200));
-            spriteBatch.Draw(solidTexture, horn2, new Color(220, 220, 200));
+            // Draw goat using aseprite sprite
+            if (goatSprite != null && goatSprite.IsLoaded)
+            {
+                // Check if goat is moving
+                bool isMoving = goatVelocity.LengthSquared() > 0;
+                
+                // Draw goat sprite centered at position
+                Vector2 drawPos = new Vector2(
+                    goatPosition.X + goatSize.X / 2 - goatSprite.Size.X / 2,
+                    goatPosition.Y + goatSize.Y / 2 - goatSprite.Size.Y / 2);
+                
+                // Flip sprite based on movement direction
+                SpriteEffects flip = goatVelocity.X < 0 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                goatSprite.Draw(spriteBatch, drawPos, isMoving, gameTime, Color.White, 10f, flip);
+            }
+            else
+            {
+                // Fallback: Draw simple rectangle placeholder goat
+                Rectangle goatRect = new Rectangle(
+                    (int)goatPosition.X,
+                    (int)goatPosition.Y,
+                    (int)goatSize.X,
+                    (int)goatSize.Y);
+                spriteBatch.Draw(solidTexture, goatRect, Color.White);
+                
+                // Draw simple goat face details
+                Rectangle goatEye1 = new Rectangle((int)goatPosition.X + 10, (int)goatPosition.Y + 10, 6, 6);
+                Rectangle goatEye2 = new Rectangle((int)goatPosition.X + 24, (int)goatPosition.Y + 10, 6, 6);
+                spriteBatch.Draw(solidTexture, goatEye1, Color.Black);
+                spriteBatch.Draw(solidTexture, goatEye2, Color.Black);
+                
+                // Draw horns
+                Rectangle horn1 = new Rectangle((int)goatPosition.X + 5, (int)goatPosition.Y - 5, 4, 8);
+                Rectangle horn2 = new Rectangle((int)goatPosition.X + 31, (int)goatPosition.Y - 5, 4, 8);
+                spriteBatch.Draw(solidTexture, horn1, new Color(220, 220, 200));
+                spriteBatch.Draw(solidTexture, horn2, new Color(220, 220, 200));
+            }
             
             // Draw rocks
             foreach (var rock in rocks)
