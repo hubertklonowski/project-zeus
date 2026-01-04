@@ -70,7 +70,8 @@ namespace ProjectZeus.Core.Entities
             else if (Velocity.X < 0)
                 flip = SpriteEffects.None;
 
-            sprite.Draw(gameTime, spriteBatch, Position + Size / 2f, flip);
+            Vector2 bottomCenter = new Vector2(Position.X + Size.X / 2f, Position.Y + Size.Y);
+            sprite.Draw(gameTime, spriteBatch, bottomCenter, flip);
         }
     }
 }
