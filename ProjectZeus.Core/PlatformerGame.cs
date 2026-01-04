@@ -100,7 +100,7 @@ namespace ProjectZeus.Core
             playerTexture = DrawingHelpers.CreateSolidTexture(GraphicsDevice, 1, 1, new Color(255, 220, 180));
 
             player = new AdonisPlayer();
-            player.LoadContent(Content);
+            player.LoadContent(GraphicsDevice);
 
             pillarRoom = new PillarRoom();
             pillarRoom.LoadContent(GraphicsDevice, hudFont);
@@ -384,11 +384,11 @@ namespace ProjectZeus.Core
             switch (currentScene)
             {
                 case GameScene.ZeusFight:
-                    zeusFightScene.Draw(spriteBatch, GraphicsDevice, playerTexture, player.Position, GameConstants.PlayerSize);
+                    zeusFightScene.Draw(spriteBatch, GraphicsDevice, player, gameTime);
                     break;
 
                 case GameScene.MazeLevel:
-                    mazeLevel.Draw(spriteBatch, GraphicsDevice);
+                    mazeLevel.Draw(spriteBatch, GraphicsDevice, player, gameTime);
                     break;
 
                 case GameScene.MountainLevel:
@@ -400,7 +400,7 @@ namespace ProjectZeus.Core
 
                 case GameScene.MineLevel:
                     spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, globalTransformation);
-                    mineLevel.Draw(spriteBatch, GraphicsDevice, gameTime, playerTexture, 
+                    mineLevel.Draw(spriteBatch, GraphicsDevice, gameTime, player,
                         DrawingHelpers.CreateSolidTexture(GraphicsDevice, 1, 1, Color.White));
                     spriteBatch.End();
                     break;

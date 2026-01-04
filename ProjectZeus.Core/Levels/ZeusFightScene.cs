@@ -1,5 +1,6 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using ProjectZeus.Core.Entities;
 
 namespace ProjectZeus.Core
 {
@@ -33,9 +34,8 @@ namespace ProjectZeus.Core
             // TODO: Add Zeus fight logic here in the future.
         }
 
-        public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, Texture2D playerTexture, Vector2 playerPosition, Vector2 playerSize)
+        public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, AdonisPlayer player, GameTime gameTime)
         {
-            // Clear to a darker blue sky.
             graphicsDevice.Clear(new Color(20, 30, 80));
 
             if (solidTexture == null)
@@ -43,15 +43,12 @@ namespace ProjectZeus.Core
 
             spriteBatch.Begin();
 
-            // Sky band.
             Rectangle skyRect = new Rectangle(0, 0, (int)baseScreenSize.X, (int)(baseScreenSize.Y * 0.7f));
             spriteBatch.Draw(solidTexture, skyRect, new Color(40, 70, 140));
 
-            // Ground/platform.
             Rectangle groundRect = new Rectangle(0, (int)(baseScreenSize.Y * 0.7f), (int)baseScreenSize.X, (int)(baseScreenSize.Y * 0.3f));
             spriteBatch.Draw(solidTexture, groundRect, new Color(60, 50, 40));
 
-            // Simple "Zeus" placeholder on the left side.
             int zeusWidth = 80;
             int zeusHeight = 120;
             int zeusMarginFromLeft = 40;
@@ -62,16 +59,7 @@ namespace ProjectZeus.Core
                 zeusHeight);
             spriteBatch.Draw(solidTexture, zeusRect, new Color(220, 220, 240));
 
-            // Draw the player on the right side using the provided texture and position.
-            if (playerTexture != null)
-            {
-                Rectangle playerRect = new Rectangle(
-                    (int)playerPosition.X,
-                    (int)playerPosition.Y,
-                    (int)playerSize.X,
-                    (int)playerSize.Y);
-                spriteBatch.Draw(playerTexture, playerRect, Color.White);
-            }
+            player.Draw(gameTime, spriteBatch);
 
             if (titleFont != null)
             {

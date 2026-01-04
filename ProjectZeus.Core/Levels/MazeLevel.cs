@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
+using ProjectZeus.Core.Entities;
 
 namespace ProjectZeus.Core
 {
@@ -488,47 +489,39 @@ namespace ProjectZeus.Core
             return false;
         }
         
-        public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice)
+        public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, AdonisPlayer player, GameTime gameTime)
         {
-            graphicsDevice.Clear(new Color(20, 20, 20)); // Dark background
+            graphicsDevice.Clear(new Color(20, 20, 20));
             
             spriteBatch.Begin();
             
-            // Calculate the cell the player is currently in
             int playerCellX = (int)((playerPosition.X + playerSize.X / 2) / cellSize);
             int playerCellY = (int)((playerPosition.Y + playerSize.Y / 2) / cellSize);
             
-            // Draw visible maze cells
             for (int x = 0; x < mazeWidth; x++)
             {
                 for (int y = 0; y < mazeHeight; y++)
                 {
-                    // Calculate distance from player
                     int dx = Math.Abs(x - playerCellX);
                     int dy = Math.Abs(y - playerCellY);
                     
-                    // Only draw cells within visibility radius
                     if (dx <= visibilityRadius && dy <= visibilityRadius)
                     {
                         Rectangle cellRect = new Rectangle(x * cellSize, y * cellSize, cellSize, cellSize);
                         
                         if (walls[x, y])
                         {
-                            // Draw wall
                             spriteBatch.Draw(solidTexture, cellRect, new Color(100, 100, 120));
-                            // Wall border
                             DrawRectangleOutline(spriteBatch, cellRect, new Color(80, 80, 100));
                         }
                         else
                         {
-                            // Draw passage
                             spriteBatch.Draw(solidTexture, cellRect, new Color(40, 40, 45));
                         }
                     }
                 }
             }
             
-            // Draw item if not collected and visible
             if (!itemCollected)
             {
                 int itemCellX = (int)(itemPosition.X / cellSize);
@@ -544,7 +537,6 @@ namespace ProjectZeus.Core
                 }
             }
             
-            // Draw minotaur if active and visible
             if (minotaurActive)
             {
                 int minotaurCellX = (int)((minotaurPosition.X + minotaurSize.X / 2) / cellSize);
@@ -556,10 +548,9 @@ namespace ProjectZeus.Core
                 {
                     Rectangle minotaurRect = new Rectangle((int)minotaurPosition.X, (int)minotaurPosition.Y,
                                                            (int)minotaurSize.X, (int)minotaurSize.Y);
-                    spriteBatch.Draw(solidTexture, minotaurRect, new Color(139, 69, 19)); // Brown
+                    spriteBatch.Draw(solidTexture, minotaurRect, new Color(139, 69, 19));
                     DrawRectangleOutline(spriteBatch, minotaurRect, new Color(101, 51, 15));
                     
-                    // Draw horns
                     Rectangle horn1 = new Rectangle((int)minotaurPosition.X + 2, (int)minotaurPosition.Y, 6, 8);
                     Rectangle horn2 = new Rectangle((int)minotaurPosition.X + (int)minotaurSize.X - 8, (int)minotaurPosition.Y, 6, 8);
                     spriteBatch.Draw(solidTexture, horn1, Color.White);
@@ -567,7 +558,6 @@ namespace ProjectZeus.Core
                 }
             }
             
-            // Draw entrance marker if visible and item is collected
             if (itemCollected)
             {
                 int entranceCellX = (int)(entrancePosition.X / cellSize);
@@ -578,18 +568,13 @@ namespace ProjectZeus.Core
                 if (entranceDx <= visibilityRadius && entranceDy <= visibilityRadius)
                 {
                     Rectangle entranceRect = new Rectangle((int)(entrancePosition.X - 14), (int)(entrancePosition.Y - 14), 28, 28);
-                    spriteBatch.Draw(solidTexture, entranceRect, new Color(0, 255, 0, 128)); // Green with transparency
+                    spriteBatch.Draw(solidTexture, entranceRect, new Color(0, 255, 0, 128));
                     DrawRectangleOutline(spriteBatch, entranceRect, Color.LimeGreen);
                 }
             }
             
-            // Draw player
-            Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y,
-                                                 (int)playerSize.X, (int)playerSize.Y);
-            spriteBatch.Draw(solidTexture, playerRect, new Color(255, 220, 180));
-            DrawRectangleOutline(spriteBatch, playerRect, new Color(200, 160, 120));
+            player.Draw(gameTime, spriteBatch);
             
-            // If carrying item, draw it above player
             if (itemCollected)
             {
                 Rectangle carriedItemRect = new Rectangle((int)playerPosition.X + (int)playerSize.X / 2 - 10,

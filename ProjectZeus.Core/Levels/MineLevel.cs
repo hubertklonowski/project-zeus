@@ -213,7 +213,7 @@ namespace ProjectZeus.Core.Levels
         }
 
         public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, GameTime gameTime, 
-            Texture2D playerTexture, Texture2D portalTexture)
+            AdonisPlayer player, Texture2D portalTexture)
         {
             if (!IsActive) return;
 
@@ -262,10 +262,10 @@ namespace ProjectZeus.Core.Levels
 
             if (!itemCollected)
             {
-                spriteBatch.Draw(playerTexture, itemRect, Color.Gold);
+                spriteBatch.Draw(platformTexture, itemRect, Color.Gold);
                 Rectangle glowRect = itemRect;
                 glowRect.Inflate(5, 5);
-                spriteBatch.Draw(playerTexture, glowRect, new Color((byte)255, (byte)215, (byte)0, (byte)100));
+                spriteBatch.Draw(platformTexture, glowRect, new Color((byte)255, (byte)215, (byte)0, (byte)100));
             }
 
             float wingTime = (float)gameTime.TotalGameTime.TotalSeconds;
@@ -281,9 +281,7 @@ namespace ProjectZeus.Core.Levels
 
             DrawingHelpers.DrawPortal(spriteBatch, portalTexture, exitRect, gameTime, new Color(100, 50, 200));
 
-            Rectangle minePlayerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, 
-                (int)GameConstants.PlayerSize.X, (int)GameConstants.PlayerSize.Y);
-            spriteBatch.Draw(playerTexture, minePlayerRect, Color.White);
+            player.Draw(gameTime, spriteBatch);
 
             if (itemCollected)
             {
