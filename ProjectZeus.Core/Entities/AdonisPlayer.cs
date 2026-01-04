@@ -5,7 +5,6 @@ using AsepriteDotNet.IO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Aseprite;
-using ProjectZeus.Core.Constants;
 
 namespace ProjectZeus.Core.Entities
 {
@@ -19,13 +18,17 @@ namespace ProjectZeus.Core.Entities
         private Texture2D adonisTexture;
         private AsepriteFile adonisFile;
         private int frameCount = 8;
+        private int spriteWidth;
+        private int spriteHeight;
         private SpriteEffects flip = SpriteEffects.None;
         private bool isLoaded = false;
 
         public Vector2 Position { get; set; }
         public Vector2 Velocity { get; set; }
         public bool IsOnGround { get; set; }
-        public Vector2 Size => GameConstants.PlayerSize;
+        
+        // Use actual sprite dimensions instead of hardcoded values
+        public Vector2 Size => new Vector2(spriteWidth, spriteHeight);
 
         public Rectangle Bounds => new Rectangle(
             (int)Position.X, 
@@ -38,6 +41,8 @@ namespace ProjectZeus.Core.Entities
             Position = Vector2.Zero;
             Velocity = Vector2.Zero;
             IsOnGround = false;
+            spriteWidth = 32;  // Default fallback
+            spriteHeight = 48; // Default fallback
         }
 
         public void LoadContent(GraphicsDevice graphicsDevice)
@@ -51,6 +56,10 @@ namespace ProjectZeus.Core.Entities
                     var sprite = adonisFile.CreateSprite(graphicsDevice, frameIndex: 0, onlyVisibleLayers: true, includeBackgroundLayer: false, includeTilemapLayers: false);
                     adonisTexture = sprite.TextureRegion.Texture;
                     frameCount = adonisFile.Frames.Length;
+                    
+                    // Get actual sprite dimensions from the aseprite file
+                    spriteWidth = sprite.TextureRegion.Bounds.Width;
+                    spriteHeight = sprite.TextureRegion.Bounds.Height;
                 }
                 
                 isLoaded = true;
@@ -60,14 +69,16 @@ namespace ProjectZeus.Core.Entities
                 Console.WriteLine($"Could not load adonis.aseprite: {ex.Message}");
                 Console.WriteLine($"Stack: {ex.StackTrace}");
                 adonisTexture = CreatePlaceholderTexture(graphicsDevice);
+                spriteWidth = 32;
+                spriteHeight = 48;
                 isLoaded = true;
             }
         }
 
         private Texture2D CreatePlaceholderTexture(GraphicsDevice graphicsDevice)
         {
-            var texture = new Texture2D(graphicsDevice, 32, 48);
-            Color[] data = new Color[32 * 48];
+            var texture = new Texture2D(graphicsDevice, spriteWidth, spriteHeight);
+            Color[] data = new Color[spriteWidth * spriteHeight];
             for (int i = 0; i < data.Length; i++)
                 data[i] = new Color(255, 220, 180);
             texture.SetData(data);
@@ -112,8 +123,8 @@ namespace ProjectZeus.Core.Entities
             else
             {
                 // Fallback
-                var sourceRect = new Rectangle(0, 0, 32, 48);
-                var origin = new Vector2(16f, 48f);
+                var sourceRect = new Rectangle(0, 0, spriteWidth, spriteHeight);
+                var origin = new Vector2(spriteWidth / 2f, spriteHeight);
                 var destPos = Position + new Vector2(Size.X / 2f, Size.Y);
 
                 flip = SpriteEffects.None;

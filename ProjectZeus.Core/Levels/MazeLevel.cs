@@ -21,7 +21,7 @@ namespace ProjectZeus.Core
         private bool[,] walls; // true = wall, false = passage
         private Vector2 playerPosition;
         private Vector2 playerVelocity;
-        private readonly Vector2 playerSize = new Vector2(24, 24);
+        private readonly Vector2 playerSize = new Vector2(28, 28); // Adjusted to fit maze tiles better
         private Vector2 itemPosition;
         private bool itemCollected;
         
@@ -497,10 +497,13 @@ namespace ProjectZeus.Core
             player.Position = playerPosition;
             player.Velocity = playerVelocity;
             
+            // Use actual player sprite size for collision/positioning
+            Vector2 actualPlayerSize = player.Size;
+            
             spriteBatch.Begin();
             
-            int playerCellX = (int)((playerPosition.X + playerSize.X / 2) / cellSize);
-            int playerCellY = (int)((playerPosition.Y + playerSize.Y / 2) / cellSize);
+            int playerCellX = (int)((playerPosition.X + actualPlayerSize.X / 2) / cellSize);
+            int playerCellY = (int)((playerPosition.Y + actualPlayerSize.Y / 2) / cellSize);
             
             for (int x = 0; x < mazeWidth; x++)
             {
