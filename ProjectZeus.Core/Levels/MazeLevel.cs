@@ -1,8 +1,14 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Microsoft.Xna.Framework.Content;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using ProjectZeus.Core.Entities;
+using AsepriteDotNet.Aseprite;
+using AsepriteDotNet.IO;
+using MonoGame.Aseprite;
 
 namespace ProjectZeus.Core
 {
@@ -20,7 +26,7 @@ namespace ProjectZeus.Core
         private bool[,] walls; // true = wall, false = passage
         private Vector2 playerPosition;
         private Vector2 playerVelocity;
-        private readonly Vector2 playerSize = new Vector2(24, 24);
+        private readonly Vector2 playerSize = new Vector2(28, 28); // Adjusted to fit maze tiles better
         private Vector2 itemPosition;
         private bool itemCollected;
         
@@ -39,6 +45,8 @@ namespace ProjectZeus.Core
         
         // Graphics
         private Texture2D solidTexture;
+        private Texture2D hedgeTexture;
+        private Texture2D sandTileTexture;
         private SpriteFont font;
         
         // Visibility (slightly smaller radius to force more exploration)
@@ -64,13 +72,112 @@ namespace ProjectZeus.Core
         
         public void LoadContent(GraphicsDevice graphicsDevice, SpriteFont spriteFont)
         {
-            // Create a 1x1 solid texture for drawing rectangles
+            // Create a 1x1 solid texture for drawing rectangles (for items and minotaur)
             solidTexture = new Texture2D(graphicsDevice, 1, 1);
             solidTexture.SetData(new[] { Color.White });
+            
+            // Load the aseprite textures using the same method as AdonisPlayer
+            hedgeTexture = LoadAsepriteTexture(graphicsDevice, "Content/Sprites/hedge.aseprite");
+            sandTileTexture = LoadAsepriteTexture(graphicsDevice, "Content/Sprites/sandtile.aseprite");
+            
+            // Fallback to created textures if aseprite files are not available
+            if (hedgeTexture == null)
+                hedgeTexture = CreateHedgeTexture(graphicsDevice);
+            if (sandTileTexture == null)
+                sandTileTexture = CreateSandTileTexture(graphicsDevice);
+            
             font = spriteFont;
             
             GenerateMaze();
             PlacePlayerAndItem();
+        }
+        
+        private Texture2D LoadAsepriteTexture(GraphicsDevice graphicsDevice, string filePath)
+        {
+            try
+            {
+                using (var stream = TitleContainer.OpenStream(filePath))
+                {
+                    var asepriteFile = AsepriteFileLoader.FromStream(Path.GetFileNameWithoutExtension(filePath), stream);
+                    var sprite = asepriteFile.CreateSprite(graphicsDevice, frameIndex: 0, onlyVisibleLayers: true, includeBackgroundLayer: false, includeTilemapLayers: false);
+                    return sprite.TextureRegion.Texture;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Could not load {filePath}: {ex.Message}");
+                return null;
+            }
+        }
+        
+        private Texture2D CreateHedgeTexture(GraphicsDevice graphicsDevice)
+        {
+            Texture2D texture = new Texture2D(graphicsDevice, cellSize, cellSize);
+            Color[] data = new Color[cellSize * cellSize];
+            
+            // Create a hedge-like pattern with green colors
+            Color darkGreen = new Color(34, 100, 34);
+            Color mediumGreen = new Color(50, 130, 50);
+            Color lightGreen = new Color(70, 150, 70);
+            
+            for (int y = 0; y < cellSize; y++)
+            {
+                for (int x = 0; x < cellSize; x++)
+                {
+                    int index = y * cellSize + x;
+                    
+                    // Create a hedge pattern with some variation
+                    int variation = (x + y) % 3;
+                    if (variation == 0)
+                        data[index] = darkGreen;
+                    else if (variation == 1)
+                        data[index] = mediumGreen;
+                    else
+                        data[index] = lightGreen;
+                    
+                    // Add some darker spots for texture
+                    if ((x + y) % 5 == 0 || (x * 2 + y) % 7 == 0)
+                        data[index] = darkGreen;
+                }
+            }
+            
+            texture.SetData(data);
+            return texture;
+        }
+        
+        private Texture2D CreateSandTileTexture(GraphicsDevice graphicsDevice)
+        {
+            Texture2D texture = new Texture2D(graphicsDevice, cellSize, cellSize);
+            Color[] data = new Color[cellSize * cellSize];
+            
+            // Create a sandy pattern with tan/brown colors
+            Color lightSand = new Color(194, 178, 128);
+            Color mediumSand = new Color(160, 144, 104);
+            Color darkSand = new Color(140, 124, 84);
+            
+            for (int y = 0; y < cellSize; y++)
+            {
+                for (int x = 0; x < cellSize; x++)
+                {
+                    int index = y * cellSize + x;
+                    
+                    // Create a sandy pattern with subtle variation
+                    int variation = (x * 3 + y * 2) % 4;
+                    if (variation == 0)
+                        data[index] = lightSand;
+                    else if (variation == 1 || variation == 2)
+                        data[index] = mediumSand;
+                    else
+                        data[index] = darkSand;
+                    
+                    // Add some speckles for texture
+                    if ((x * 7 + y * 5) % 11 == 0)
+                        data[index] = darkSand;
+                }
+            }
+            
+            texture.SetData(data);
+            return texture;
         }
         
         private void GenerateMaze()
@@ -488,41 +595,43 @@ namespace ProjectZeus.Core
             return false;
         }
         
-        public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice)
+        public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, AdonisPlayer player, GameTime gameTime)
         {
-            graphicsDevice.Clear(new Color(20, 20, 20)); // Dark background
+            graphicsDevice.Clear(new Color(20, 20, 20));
+            
+            // Sync player position and velocity to AdonisPlayer for rendering
+            player.Position = playerPosition;
+            player.Velocity = playerVelocity;
+            
+            // Use actual player sprite size for collision/positioning
+            Vector2 actualPlayerSize = player.Size;
             
             spriteBatch.Begin();
             
-            // Calculate the cell the player is currently in
-            int playerCellX = (int)((playerPosition.X + playerSize.X / 2) / cellSize);
-            int playerCellY = (int)((playerPosition.Y + playerSize.Y / 2) / cellSize);
+            int playerCellX = (int)((playerPosition.X + actualPlayerSize.X / 2) / cellSize);
+            int playerCellY = (int)((playerPosition.Y + actualPlayerSize.Y / 2) / cellSize);
             
-            // Draw visible maze cells
+            // Draw maze cells within visibility radius
             for (int x = 0; x < mazeWidth; x++)
             {
                 for (int y = 0; y < mazeHeight; y++)
                 {
-                    // Calculate distance from player
                     int dx = Math.Abs(x - playerCellX);
                     int dy = Math.Abs(y - playerCellY);
                     
-                    // Only draw cells within visibility radius
                     if (dx <= visibilityRadius && dy <= visibilityRadius)
                     {
                         Rectangle cellRect = new Rectangle(x * cellSize, y * cellSize, cellSize, cellSize);
                         
                         if (walls[x, y])
                         {
-                            // Draw wall
-                            spriteBatch.Draw(solidTexture, cellRect, new Color(100, 100, 120));
-                            // Wall border
-                            DrawRectangleOutline(spriteBatch, cellRect, new Color(80, 80, 100));
+                            // Draw hedge texture for walls
+                            spriteBatch.Draw(hedgeTexture, cellRect, Color.White);
                         }
                         else
                         {
-                            // Draw passage
-                            spriteBatch.Draw(solidTexture, cellRect, new Color(40, 40, 45));
+                            // Draw sand tile texture for floors
+                            spriteBatch.Draw(sandTileTexture, cellRect, Color.White);
                         }
                     }
                 }
@@ -556,10 +665,9 @@ namespace ProjectZeus.Core
                 {
                     Rectangle minotaurRect = new Rectangle((int)minotaurPosition.X, (int)minotaurPosition.Y,
                                                            (int)minotaurSize.X, (int)minotaurSize.Y);
-                    spriteBatch.Draw(solidTexture, minotaurRect, new Color(139, 69, 19)); // Brown
+                    spriteBatch.Draw(solidTexture, minotaurRect, new Color(139, 69, 19));
                     DrawRectangleOutline(spriteBatch, minotaurRect, new Color(101, 51, 15));
                     
-                    // Draw horns
                     Rectangle horn1 = new Rectangle((int)minotaurPosition.X + 2, (int)minotaurPosition.Y, 6, 8);
                     Rectangle horn2 = new Rectangle((int)minotaurPosition.X + (int)minotaurSize.X - 8, (int)minotaurPosition.Y, 6, 8);
                     spriteBatch.Draw(solidTexture, horn1, Color.White);
@@ -567,7 +675,7 @@ namespace ProjectZeus.Core
                 }
             }
             
-            // Draw entrance marker if visible and item is collected
+            // Draw entrance/exit if item is collected and visible
             if (itemCollected)
             {
                 int entranceCellX = (int)(entrancePosition.X / cellSize);
@@ -578,18 +686,15 @@ namespace ProjectZeus.Core
                 if (entranceDx <= visibilityRadius && entranceDy <= visibilityRadius)
                 {
                     Rectangle entranceRect = new Rectangle((int)(entrancePosition.X - 14), (int)(entrancePosition.Y - 14), 28, 28);
-                    spriteBatch.Draw(solidTexture, entranceRect, new Color(0, 255, 0, 128)); // Green with transparency
+                    spriteBatch.Draw(solidTexture, entranceRect, new Color(0, 255, 0, 128));
                     DrawRectangleOutline(spriteBatch, entranceRect, Color.LimeGreen);
                 }
             }
             
             // Draw player
-            Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y,
-                                                 (int)playerSize.X, (int)playerSize.Y);
-            spriteBatch.Draw(solidTexture, playerRect, new Color(255, 220, 180));
-            DrawRectangleOutline(spriteBatch, playerRect, new Color(200, 160, 120));
+            player.Draw(gameTime, spriteBatch);
             
-            // If carrying item, draw it above player
+            // Draw carried item indicator if item is collected
             if (itemCollected)
             {
                 Rectangle carriedItemRect = new Rectangle((int)playerPosition.X + (int)playerSize.X / 2 - 10,
