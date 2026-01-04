@@ -25,7 +25,7 @@
     <None Update="Content\Sprites\grapes.aseprite">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Content\Sprites\maze_tile.aseprite">
+    <None Update="Content\Sprites\hedge.aseprite">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Content\Sprites\minotaur.aseprite">
