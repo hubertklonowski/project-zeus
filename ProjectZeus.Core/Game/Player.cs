@@ -132,17 +132,20 @@ namespace Platformer2D
         /// </summary>
         public void LoadContent()
         {
-            // Load animated textures.
-            idleAnimation = new Animation(Level.Content.Load<Texture2D>("Sprites/Player/Idle"), 0.1f, true);
-            runAnimation = new Animation(Level.Content.Load<Texture2D>("Sprites/Player/Run"), 0.1f, true);
-            jumpAnimation = new Animation(Level.Content.Load<Texture2D>("Sprites/Player/Jump"), 0.1f, false);
-            celebrateAnimation = new Animation(Level.Content.Load<Texture2D>("Sprites/Player/Celebrate"), 0.1f, false);
-            dieAnimation = new Animation(Level.Content.Load<Texture2D>("Sprites/Player/Die"), 0.1f, false);
+            // Note: Player sprites are no longer used in the new Zeus game
+            // Load a minimal 1x1 texture to prevent errors
+            Texture2D dummyTexture = Level.Content.Load<Texture2D>("Sprites/Gem");
+            
+            idleAnimation = new Animation(dummyTexture, 0.1f, true);
+            runAnimation = new Animation(dummyTexture, 0.1f, true);
+            jumpAnimation = new Animation(dummyTexture, 0.1f, false);
+            celebrateAnimation = new Animation(dummyTexture, 0.1f, false);
+            dieAnimation = new Animation(dummyTexture, 0.1f, false);
 
             // Calculate bounds within texture size.            
-            int width = (int)(idleAnimation.FrameWidth * 0.4);
-            int left = (idleAnimation.FrameWidth - width) / 2;
-            int height = (int)(idleAnimation.FrameHeight * 0.8);
+            int width = 32;
+            int left = 0;
+            int height = 40;
             int top = idleAnimation.FrameHeight - height;
             localBounds = new Rectangle(left, top, width, height);
 
