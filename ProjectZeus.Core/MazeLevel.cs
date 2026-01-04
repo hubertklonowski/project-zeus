@@ -12,8 +12,8 @@ namespace ProjectZeus.Core
     public class MazeLevel
     {
         private readonly Vector2 baseScreenSize = new Vector2(800, 480);
-        private readonly int mazeWidth = 41;  // Increased from 25 for bigger maze
-        private readonly int mazeHeight = 25; // Increased from 15 for bigger maze
+        private readonly int mazeWidth = 25;  // Maze fits inside the 800px width
+        private readonly int mazeHeight = 15; // Maze fits inside the 480px height
         private readonly int cellSize = 32;
         
         // Maze data
@@ -41,11 +41,11 @@ namespace ProjectZeus.Core
         private Texture2D solidTexture;
         private SpriteFont font;
         
-        // Visibility
-        private const int visibilityRadius = 4; // cells visible around player
+        // Visibility (slightly smaller radius to force more exploration)
+        private const int visibilityRadius = 3; // cells visible around player
         
         // Configuration constants
-        private const float minItemDistanceFromPlayer = 600f; // Increased from 300f to hide item better
+        private const float minItemDistanceFromPlayer = 500f; // Increased so the item is well hidden
         private const float minMinotaurSpawnDistance = 150f;
         private const double minotaurDirectionChangeChance = 0.02; // 2% chance per frame
         
@@ -173,12 +173,30 @@ namespace ProjectZeus.Core
                 }
             }
             
-            // Place item far from player
+            // Prefer placing the item in the opposite half of the maze to hide it better
+            Point playerCell = new Point((int)(playerPosition.X / cellSize), (int)(playerPosition.Y / cellSize));
+            bool preferRightSide = playerCell.X < mazeWidth / 2;
+            bool preferBottomSide = playerCell.Y < mazeHeight / 2;
+            
             int attempts = 0;
-            while (attempts < 100)
+            while (attempts < 150)
             {
-                int itemX = random.Next(1, mazeWidth - 1);
-                int itemY = random.Next(1, mazeHeight - 1);
+                int itemX;
+                int itemY;
+                
+                // Bias item towards far quadrant
+                if (random.NextDouble() < 0.7)
+                {
+                    itemX = preferRightSide ? random.Next(mazeWidth / 2, mazeWidth - 1)
+                                            : random.Next(1, mazeWidth / 2);
+                    itemY = preferBottomSide ? random.Next(mazeHeight / 2, mazeHeight - 1)
+                                              : random.Next(1, mazeHeight / 2);
+                }
+                else
+                {
+                    itemX = random.Next(1, mazeWidth - 1);
+                    itemY = random.Next(1, mazeHeight - 1);
+                }
                 
                 if (!walls[itemX, itemY])
                 {
@@ -186,15 +204,81 @@ namespace ProjectZeus.Core
                                                   itemY * cellSize + cellSize / 2);
                     float distance = Vector2.Distance(playerPosition, itemPos);
                     
-                    // Make sure item is reasonably far from player
-                    if (distance > minItemDistanceFromPlayer)
+                    if (distance > minItemDistanceFromPlayer &&
+                        IsReachableCell(playerCell, new Point(itemX, itemY)))
                     {
                         itemPosition = itemPos;
-                        break;
+                        return;
                     }
                 }
                 attempts++;
             }
+            
+            // Fallback: choose any reachable cell furthest from player
+            Point bestCell = playerCell;
+            float bestDistance = 0f;
+            
+            for (int x = 1; x < mazeWidth - 1; x++)
+            {
+                for (int y = 1; y < mazeHeight - 1; y++)
+                {
+                    if (!walls[x, y])
+                    {
+                        Point target = new Point(x, y);
+                        if (IsReachableCell(playerCell, target))
+                        {
+                            Vector2 cellCenter = new Vector2(x * cellSize + cellSize / 2,
+                                                             y * cellSize + cellSize / 2);
+                            float dist = Vector2.Distance(playerPosition, cellCenter);
+                            if (dist > bestDistance)
+                            {
+                                bestDistance = dist;
+                                bestCell = target;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            itemPosition = new Vector2(bestCell.X * cellSize + cellSize / 2,
+                                       bestCell.Y * cellSize + cellSize / 2);
+        }
+        
+        // Simple BFS over passage cells to ensure there is a walkable path between two cells
+        private bool IsReachableCell(Point start, Point target)
+        {
+            if (walls[target.X, target.Y])
+                return false;
+            
+            bool[,] visited = new bool[mazeWidth, mazeHeight];
+            Queue<Point> queue = new Queue<Point>();
+            queue.Enqueue(start);
+            visited[start.X, start.Y] = true;
+            
+            int[] dx = { -1, 1, 0, 0 };
+            int[] dy = { 0, 0, -1, 1 };
+            
+            while (queue.Count > 0)
+            {
+                Point current = queue.Dequeue();
+                if (current == target)
+                    return true;
+                
+                for (int dir = 0; dir < 4; dir++)
+                {
+                    int nx = current.X + dx[dir];
+                    int ny = current.Y + dy[dir];
+                    
+                    if (nx > 0 && nx < mazeWidth - 1 && ny > 0 && ny < mazeHeight - 1 &&
+                        !walls[nx, ny] && !visited[nx, ny])
+                    {
+                        visited[nx, ny] = true;
+                        queue.Enqueue(new Point(nx, ny));
+                    }
+                }
+            }
+            
+            return false;
         }
         
         public void Update(GameTime gameTime, KeyboardState keyboardState)
@@ -246,8 +330,7 @@ namespace ProjectZeus.Core
                 }
             }
             
-            // Clamp player position to window bounds to prevent going off-screen
-            playerPosition = ClampPositionToWindowBounds(playerPosition, playerSize);
+            // Maze already fits inside the window; no additional clamping needed.
             
             // Update minotaur
             UpdateMinotaur(dt);
@@ -358,9 +441,6 @@ namespace ProjectZeus.Core
                 }
             }
             
-            // Clamp minotaur position to window bounds
-            minotaurPosition = ClampPositionToWindowBounds(minotaurPosition, minotaurSize);
-            
             // Check collision with player
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y,
                                                  (int)playerSize.X, (int)playerSize.Y);
@@ -375,9 +455,6 @@ namespace ProjectZeus.Core
                     pushDir.Normalize();
                 
                 Vector2 pushedPosition = playerPosition + pushDir * 50f * dt;
-                
-                // Clamp to window bounds first
-                pushedPosition = ClampPositionToWindowBounds(pushedPosition, playerSize);
                 
                 // Only apply push if it doesn't push player into a wall
                 if (!CheckWallCollision(pushedPosition, playerSize))
@@ -411,27 +488,13 @@ namespace ProjectZeus.Core
             return false;
         }
         
-        /// <summary>
-        /// Clamps a position to stay within the visible window bounds.
-        /// </summary>
-        /// <param name="position">The position to clamp</param>
-        /// <param name="size">The size of the entity at this position</param>
-        /// <returns>A position guaranteed to keep the entity fully within the window</returns>
-        private Vector2 ClampPositionToWindowBounds(Vector2 position, Vector2 size)
-        {
-            return new Vector2(
-                Math.Max(0, Math.Min(baseScreenSize.X - size.X, position.X)),
-                Math.Max(0, Math.Min(baseScreenSize.Y - size.Y, position.Y))
-            );
-        }
-        
         public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice)
         {
             graphicsDevice.Clear(new Color(20, 20, 20)); // Dark background
             
             spriteBatch.Begin();
             
-            // Calculate camera offset to center on player
+            // Calculate the cell the player is currently in
             int playerCellX = (int)((playerPosition.X + playerSize.X / 2) / cellSize);
             int playerCellY = (int)((playerPosition.Y + playerSize.Y / 2) / cellSize);
             
