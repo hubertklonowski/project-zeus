@@ -45,7 +45,7 @@ namespace ProjectZeus.Core
         private const int visibilityRadius = 3; // cells visible around player
         
         // Configuration constants
-        private const float minItemDistanceFromPlayer = 500f; // Increased so the item is well hidden
+        private const float minItemDistanceFromPlayer = 500f; // Item is well hidden but still reachable
         private const float minMinotaurSpawnDistance = 150f;
         private const double minotaurDirectionChangeChance = 0.02; // 2% chance per frame
         

@@ -73,6 +73,7 @@ namespace ProjectZeus.Core
 
         // Mine portal (in pillar room)
         private Rectangle minePortalRect;
+        private bool minePortalActive = true; // portal is active until the mine item has been taken out
 
         // Scene management.
         private bool inZeusFightScene;
@@ -113,6 +114,7 @@ namespace ProjectZeus.Core
         private bool inMazeLevel;
         private MazeLevel mazeLevel;
         private bool hasCollectedItem;
+        private bool mazePortalActive = true; // hide after returning with item
 
         // Portal for maze entrance
         private Vector2 mazePortalPosition;
@@ -132,6 +134,7 @@ namespace ProjectZeus.Core
         // Portal to mountain level
         private Vector2 mountainPortalPosition;
         private Vector2 mountainPortalSize = new Vector2(60, 80);
+        private bool mountainPortalActive = true; // hide after returning with item
 
         public PlatformerGame()
         {
@@ -242,7 +245,13 @@ namespace ProjectZeus.Core
 
             // Maze portal: between pillar 1 and 2
             float mazePortalX = (pillars[0].Position.X + pillars[1].Position.X) / 2f - mazePortalSize.X / 2f;
-            mazePortalPosition = new Vector2(mazePortalX, groundTop - mazePortalSize.Y);
+            float mazePortalY = groundTop - mazePortalSize.Y;
+            mazePortalPosition = new Vector2(mazePortalX, mazePortalY);
+
+            // Mountain portal: just to the right of the rightmost pillar
+            float mountainPortalX = pillars[2].GetPillarRectangle().Right + 40f; // 40px gap to the right
+            float mountainPortalY = groundTop - mountainPortalSize.Y;
+            mountainPortalPosition = new Vector2(mountainPortalX, mountainPortalY);
 
             inZeusFightScene = false;
             zeusFightScene = new ZeusFightScene();
@@ -261,10 +270,11 @@ namespace ProjectZeus.Core
             mountainLevel = new MountainLevel();
             mountainLevel.LoadContent(GraphicsDevice, hudFont);
             hasItemFromMountain = false;
+            mountainPortalActive = true;
 
-            // Mountain portal on the right side of the screen.
-            float mountainPortalX = baseScreenSize.X - 100f;
-            mountainPortalPosition = new Vector2(mountainPortalX, groundTop - mountainPortalSize.Y);
+            inMineLevel = false;
+            hasCollectedMineItem = false;
+            minePortalActive = true;
         }
 
         public void ScalePresentationArea()
@@ -491,9 +501,9 @@ namespace ProjectZeus.Core
             // Update portal animation
             portalAnimationTime += (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-            // Check if player enters the mine portal
+            // Check if player enters the mine portal (only if still active)
             Rectangle playerRect2 = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
-            if (playerRect2.Intersects(minePortalRect) && !inMineLevel)
+            if (minePortalActive && playerRect2.Intersects(minePortalRect) && !inMineLevel)
             {
                 LoadMineLevel();
                 return;
@@ -509,11 +519,14 @@ namespace ProjectZeus.Core
                     TryInsertItemAtPlayer();
                 }
 
-                TryEnterMountainPortal();
+                if (mountainPortalActive)
+                {
+                    TryEnterMountainPortal();
+                }
             }
 
-            // Enter maze when touching portal (only when not carrying maze item)
-            if (!hasCollectedItem)
+            // Enter maze when touching portal (only when not carrying maze item and portal still active)
+            if (!hasCollectedItem && mazePortalActive)
             {
                 Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y,
                                                      (int)playerSize.X, (int)playerSize.Y);
@@ -616,6 +629,7 @@ namespace ProjectZeus.Core
             if (mountainLevel.ItemWasCollected && !hasItemFromMountain)
             {
                 hasItemFromMountain = true;
+                mountainPortalActive = false; // disable portal once item is taken out
                 // Return to pillar room automatically
                 ReturnToPillarRoom();
             }
@@ -675,6 +689,11 @@ namespace ProjectZeus.Core
                     pillarHasItem[i] = false;
                 }
             }
+
+            // Reactivate all portals on full respawn
+            mazePortalActive = true;
+            mountainPortalActive = true;
+            minePortalActive = true;
 
             float centerX = baseScreenSize.X / 2f;
             float spacing = 200f;
@@ -808,6 +827,13 @@ namespace ProjectZeus.Core
             if (playerRect.Intersects(mineExitRect))
             {
                 inMineLevel = false;
+
+                // If we are leaving the mine with the item, disable the mine portal
+                if (mineItemCollected)
+                {
+                    minePortalActive = false;
+                }
+
                 float groundTop = baseScreenSize.Y - 20f;
                 float centerX = baseScreenSize.X / 2f;
                 float spacing = 200f;
@@ -1105,24 +1131,33 @@ namespace ProjectZeus.Core
                 }
             }
 
-            // Maze portal (only when not carrying maze item)
-            if (!hasCollectedItem)
+            // Maze portal (only when not carrying maze item and portal still active)
+            if (!hasCollectedItem && mazePortalActive)
             {
-                Rectangle mazePortalRect = new Rectangle((int)mazePortalPosition.X, (int)mazePortalPosition.Y,
+                float groundTop = baseScreenSize.Y - 20f;
+                float clampedY = Math.Min(groundTop - mazePortalSize.Y, Math.Max(0f, mazePortalPosition.Y));
+
+                Rectangle mazePortalRect = new Rectangle((int)mazePortalPosition.X, (int)clampedY,
                                                          (int)mazePortalSize.X, (int)mazePortalSize.Y);
                 DrawPortal(mazePortalRect, gameTime);
             }
 
             // Mountain portal
-            Rectangle mountainPortalRect = new Rectangle(
-                (int)mountainPortalPosition.X,
-                (int)mountainPortalPosition.Y,
-                (int)mountainPortalSize.X,
-                (int)mountainPortalSize.Y);
-            DrawPortal(mountainPortalRect, gameTime);
+            if (mountainPortalActive)
+            {
+                Rectangle mountainPortalRect = new Rectangle(
+                    (int)mountainPortalPosition.X,
+                    (int)mountainPortalPosition.Y,
+                    (int)mountainPortalSize.X,
+                    (int)mountainPortalSize.Y);
+                DrawPortal(mountainPortalRect, gameTime);
+            }
 
             // Mine portal in pillar room
-            DrawPortal(minePortalRect, gameTime);
+            if (minePortalActive)
+            {
+                DrawPortal(minePortalRect, gameTime);
+            }
 
             // Player
             Rectangle playerRect2 = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
