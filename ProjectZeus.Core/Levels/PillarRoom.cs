@@ -37,7 +37,20 @@ namespace ProjectZeus.Core.Levels
             pillarTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(230, 230, 230));
             slotTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(200, 200, 255));
             skyTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(135, 206, 235));
-            portalTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, Color.White);
+            
+            // Load portal texture from vase.aseprite using AsepriteSprite loader
+            var vaseSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/vase.aseprite");
+            if (vaseSprite != null && vaseSprite.IsLoaded)
+            {
+                // Use frame 0 (idle position) as the portal texture
+                portalTexture = vaseSprite.GetFrameTexture(0);
+            }
+            
+            if (portalTexture == null)
+            {
+                // Fallback to solid texture if aseprite loading fails
+                portalTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, Color.White);
+            }
 
             SetupPillars();
             SetupPortals();

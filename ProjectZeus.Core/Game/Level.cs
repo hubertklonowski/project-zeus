@@ -27,7 +27,6 @@ namespace Platformer2D
     {
         // Physical structure of the level.
         private Tile[,] tiles;
-        private Texture2D[] layers;
         // The layer which entities are drawn on top of.
         private const int EntityLayer = 2;
 
@@ -100,16 +99,6 @@ namespace Platformer2D
             timeRemaining = TimeSpan.FromMinutes(2.0);
 
             LoadTiles(fileStream);
-
-            // Load background layer textures. For now, all levels must
-            // use the same backgrounds and only use the left-most part of them.
-            layers = new Texture2D[3];
-            for (int i = 0; i < layers.Length; ++i)
-            {
-                // Choose a random segment if each background layer for level variety.
-                int segmentIndex = levelIndex;
-                layers[i] = Content.Load<Texture2D>("Backgrounds/Layer" + i + "_" + segmentIndex);
-            }
 
             // Load sounds.
             exitReachedSound = Content.Load<SoundEffect>("Sounds/ExitReached");
@@ -196,16 +185,6 @@ namespace Platformer2D
                 // Floating platform
                 case '-':
                     return LoadTile("Platform", TileCollision.Platform);
-
-                // Various enemies
-                case 'A':
-                    return LoadEnemyTile(x, y, "MonsterA");
-                case 'B':
-                    return LoadEnemyTile(x, y, "MonsterB");
-                case 'C':
-                    return LoadEnemyTile(x, y, "MonsterC");
-                case 'D':
-                    return LoadEnemyTile(x, y, "MonsterD");
 
                 // Platform block
                 case '~':
@@ -312,17 +291,6 @@ namespace Platformer2D
             exit = GetBounds(x, y).Center;
 
             return LoadTile("Exit", TileCollision.Passable);
-        }
-
-        /// <summary>
-        /// Instantiates an enemy and puts him in the level.
-        /// </summary>
-        private Tile LoadEnemyTile(int x, int y, string spriteSet)
-        {
-            Vector2 position = RectangleExtensions.GetBottomCenter(GetBounds(x, y));
-            enemies.Add(new Enemy(this, position, spriteSet));
-
-            return new Tile(null, TileCollision.Passable);
         }
 
         /// <summary>
@@ -809,9 +777,6 @@ namespace Platformer2D
         /// </summary>
         public void Draw(GameTime gameTime, SpriteBatch spriteBatch)
         {
-            for (int i = 0; i <= EntityLayer; ++i)
-                spriteBatch.Draw(layers[i], Vector2.Zero, Color.White);
-
             DrawTiles(spriteBatch);
 
             foreach (Gem gem in gems)
@@ -830,9 +795,6 @@ namespace Platformer2D
 
             foreach (Bat bat in bats)
                 bat.Draw(gameTime, spriteBatch);
-
-            for (int i = EntityLayer + 1; i < layers.Length; ++i)
-                spriteBatch.Draw(layers[i], Vector2.Zero, Color.White);
         }
 
         /// <summary>

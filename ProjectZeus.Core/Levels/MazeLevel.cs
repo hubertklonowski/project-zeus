@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using ProjectZeus.Core.Entities;
+using ProjectZeus.Core.Rendering;
 using AsepriteDotNet.Aseprite;
 using AsepriteDotNet.IO;
 using MonoGame.Aseprite;
@@ -47,6 +48,8 @@ namespace ProjectZeus.Core
         private Texture2D solidTexture;
         private Texture2D hedgeTexture;
         private Texture2D sandTileTexture;
+        private AsepriteSprite minotaurSprite;
+        private AsepriteSprite grapesSprite;
         private SpriteFont font;
         
         // Visibility (slightly smaller radius to force more exploration)
@@ -72,13 +75,17 @@ namespace ProjectZeus.Core
         
         public void LoadContent(GraphicsDevice graphicsDevice, SpriteFont spriteFont)
         {
-            // Create a 1x1 solid texture for drawing rectangles (for items and minotaur)
+            // Create a 1x1 solid texture for drawing rectangles
             solidTexture = new Texture2D(graphicsDevice, 1, 1);
             solidTexture.SetData(new[] { Color.White });
             
-            // Load the aseprite textures using the same method as AdonisPlayer
+            // Load the aseprite textures
             hedgeTexture = LoadAsepriteTexture(graphicsDevice, "Content/Sprites/hedge.aseprite");
             sandTileTexture = LoadAsepriteTexture(graphicsDevice, "Content/Sprites/sandtile.aseprite");
+            
+            // Load sprites with animation support
+            minotaurSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/minotaur.aseprite");
+            grapesSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/grapes.aseprite");
             
             // Fallback to created textures if aseprite files are not available
             if (hedgeTexture == null)
@@ -637,7 +644,7 @@ namespace ProjectZeus.Core
                 }
             }
             
-            // Draw item if not collected and visible
+            // Draw item (grapes) if not collected and visible
             if (!itemCollected)
             {
                 int itemCellX = (int)(itemPosition.X / cellSize);
@@ -647,9 +654,21 @@ namespace ProjectZeus.Core
                 
                 if (itemDx <= visibilityRadius && itemDy <= visibilityRadius)
                 {
-                    Rectangle itemRect = new Rectangle((int)(itemPosition.X - 12), (int)(itemPosition.Y - 12), 24, 24);
-                    spriteBatch.Draw(solidTexture, itemRect, Color.Gold);
-                    DrawRectangleOutline(spriteBatch, itemRect, Color.Orange);
+                    if (grapesSprite != null && grapesSprite.IsLoaded)
+                    {
+                        // Draw grapes sprite centered at itemPosition (grapes don't move, so always use idle frame)
+                        Vector2 drawPos = new Vector2(
+                            itemPosition.X - grapesSprite.Size.X / 2, 
+                            itemPosition.Y - grapesSprite.Size.Y / 2);
+                        grapesSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime, Color.White);
+                    }
+                    else
+                    {
+                        // Fallback to colored rectangle
+                        Rectangle itemRect = new Rectangle((int)(itemPosition.X - 12), (int)(itemPosition.Y - 12), 24, 24);
+                        spriteBatch.Draw(solidTexture, itemRect, Color.Gold);
+                        DrawRectangleOutline(spriteBatch, itemRect, Color.Orange);
+                    }
                 }
             }
             
@@ -663,15 +682,33 @@ namespace ProjectZeus.Core
                 
                 if (minotaurDx <= visibilityRadius && minotaurDy <= visibilityRadius)
                 {
-                    Rectangle minotaurRect = new Rectangle((int)minotaurPosition.X, (int)minotaurPosition.Y,
-                                                           (int)minotaurSize.X, (int)minotaurSize.Y);
-                    spriteBatch.Draw(solidTexture, minotaurRect, new Color(139, 69, 19));
-                    DrawRectangleOutline(spriteBatch, minotaurRect, new Color(101, 51, 15));
-                    
-                    Rectangle horn1 = new Rectangle((int)minotaurPosition.X + 2, (int)minotaurPosition.Y, 6, 8);
-                    Rectangle horn2 = new Rectangle((int)minotaurPosition.X + (int)minotaurSize.X - 8, (int)minotaurPosition.Y, 6, 8);
-                    spriteBatch.Draw(solidTexture, horn1, Color.White);
-                    spriteBatch.Draw(solidTexture, horn2, Color.White);
+                    if (minotaurSprite != null && minotaurSprite.IsLoaded)
+                    {
+                        // Check if minotaur is moving
+                        bool isMoving = minotaurVelocity.LengthSquared() > 0;
+                        
+                        // Draw minotaur sprite centered at position
+                        Vector2 drawPos = new Vector2(
+                            minotaurPosition.X + minotaurSize.X / 2 - minotaurSprite.Size.X / 2,
+                            minotaurPosition.Y + minotaurSize.Y / 2 - minotaurSprite.Size.Y / 2);
+                        
+                        // Flip sprite based on movement direction
+                        SpriteEffects flip = minotaurVelocity.X < 0 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                        minotaurSprite.Draw(spriteBatch, drawPos, isMoving, gameTime, Color.White, 10f, flip);
+                    }
+                    else
+                    {
+                        // Fallback to colored rectangle
+                        Rectangle minotaurRect = new Rectangle((int)minotaurPosition.X, (int)minotaurPosition.Y,
+                                                               (int)minotaurSize.X, (int)minotaurSize.Y);
+                        spriteBatch.Draw(solidTexture, minotaurRect, new Color(139, 69, 19));
+                        DrawRectangleOutline(spriteBatch, minotaurRect, new Color(101, 51, 15));
+                        
+                        Rectangle horn1 = new Rectangle((int)minotaurPosition.X + 2, (int)minotaurPosition.Y, 6, 8);
+                        Rectangle horn2 = new Rectangle((int)minotaurPosition.X + (int)minotaurSize.X - 8, (int)minotaurPosition.Y, 6, 8);
+                        spriteBatch.Draw(solidTexture, horn1, Color.White);
+                        spriteBatch.Draw(solidTexture, horn2, Color.White);
+                    }
                 }
             }
             

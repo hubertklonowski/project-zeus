@@ -1,5 +1,7 @@
 using System;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using ProjectZeus.Core.Rendering;
 
 namespace ProjectZeus.Core.Entities
 {
@@ -12,8 +14,17 @@ namespace ProjectZeus.Core.Entities
         public Vector2 Velocity { get; set; }
         public float MinX { get; set; }
         public float MaxX { get; set; }
+        public AsepriteSprite Sprite { get; set; }
 
-        public Rectangle Bounds => new Rectangle((int)Position.X - 20, (int)Position.Y - 15, 40, 30);
+        public Rectangle Bounds
+        {
+            get
+            {
+                if (Sprite != null && Sprite.IsLoaded)
+                    return new Rectangle((int)(Position.X - Sprite.Size.X / 2), (int)(Position.Y - Sprite.Size.Y / 2), (int)Sprite.Size.X, (int)Sprite.Size.Y);
+                return new Rectangle((int)Position.X - 20, (int)Position.Y - 15, 40, 30);
+            }
+        }
 
         public void Update(float deltaTime)
         {
@@ -23,6 +34,26 @@ namespace ProjectZeus.Core.Entities
             {
                 Velocity = new Vector2(-Velocity.X, Velocity.Y);
                 Position = new Vector2(Math.Max(MinX, Math.Min(MaxX, Position.X)), Position.Y);
+            }
+        }
+        
+        public void Draw(SpriteBatch spriteBatch, Texture2D fallbackTexture, GameTime gameTime)
+        {
+            if (Sprite != null && Sprite.IsLoaded)
+            {
+                bool isMoving = Velocity.LengthSquared() > 0;
+                Vector2 drawPos = new Vector2(Position.X - Sprite.Size.X / 2, Position.Y - Sprite.Size.Y / 2);
+                SpriteEffects flip = Velocity.X < 0 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                Sprite.Draw(spriteBatch, drawPos, isMoving, gameTime, Color.White, 10f, flip);
+            }
+            else
+            {
+                // Fallback rendering
+                spriteBatch.Draw(fallbackTexture, Bounds, new Color(139, 69, 19));
+                Rectangle wheel1 = new Rectangle(Bounds.Left + 5, Bounds.Bottom - 5, 8, 8);
+                Rectangle wheel2 = new Rectangle(Bounds.Right - 13, Bounds.Bottom - 5, 8, 8);
+                spriteBatch.Draw(fallbackTexture, wheel1, Color.Black);
+                spriteBatch.Draw(fallbackTexture, wheel2, Color.Black);
             }
         }
     }
@@ -35,8 +66,17 @@ namespace ProjectZeus.Core.Entities
         public Vector2 Position { get; set; }
         public Vector2 Velocity { get; set; }
         public float ChangeDirectionTimer { get; set; }
+        public AsepriteSprite Sprite { get; set; }
 
-        public Rectangle Bounds => new Rectangle((int)Position.X - 10, (int)Position.Y - 10, 20, 20);
+        public Rectangle Bounds
+        {
+            get
+            {
+                if (Sprite != null && Sprite.IsLoaded)
+                    return new Rectangle((int)(Position.X - Sprite.Size.X / 2), (int)(Position.Y - Sprite.Size.Y / 2), (int)Sprite.Size.X, (int)Sprite.Size.Y);
+                return new Rectangle((int)Position.X - 10, (int)Position.Y - 10, 20, 20);
+            }
+        }
 
         private const float DirectionChangeInterval = 2f;
         private const float BatSpeed = 60f;
@@ -78,6 +118,27 @@ namespace ProjectZeus.Core.Entities
             { 
                 Position = new Vector2(Position.X, MaxY);
                 Velocity = new Vector2(Velocity.X, -Math.Abs(Velocity.Y));
+            }
+        }
+        
+        public void Draw(SpriteBatch spriteBatch, Texture2D fallbackTexture, GameTime gameTime)
+        {
+            if (Sprite != null && Sprite.IsLoaded)
+            {
+                bool isMoving = Velocity.LengthSquared() > 0;
+                Vector2 drawPos = new Vector2(Position.X - Sprite.Size.X / 2, Position.Y - Sprite.Size.Y / 2);
+                SpriteEffects flip = Velocity.X < 0 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                Sprite.Draw(spriteBatch, drawPos, isMoving, gameTime, Color.White, 10f, flip);
+            }
+            else
+            {
+                // Fallback rendering with wing animation
+                spriteBatch.Draw(fallbackTexture, Bounds, new Color(80, 60, 90));
+                float wingFlap = (float)Math.Sin(gameTime.TotalGameTime.TotalSeconds * 10f) * 5f;
+                Rectangle leftWing = new Rectangle(Bounds.Left - 8 + (int)wingFlap, Bounds.Top + 5, 8, 5);
+                Rectangle rightWing = new Rectangle(Bounds.Right - (int)wingFlap, Bounds.Top + 5, 8, 5);
+                spriteBatch.Draw(fallbackTexture, leftWing, new Color(60, 50, 70));
+                spriteBatch.Draw(fallbackTexture, rightWing, new Color(60, 50, 70));
             }
         }
     }

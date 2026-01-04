@@ -34,6 +34,9 @@ namespace ProjectZeus.Core.Levels
         private Texture2D backgroundTexture;
         private SpriteFont font;
         
+        private AsepriteSprite batSprite;
+        private AsepriteSprite cartSprite;
+        
         private Random random;
 
         public bool IsActive { get; private set; }
@@ -58,6 +61,10 @@ namespace ProjectZeus.Core.Levels
             this.font = font;
             platformTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(100, 100, 100));
             backgroundTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(20, 15, 30));
+            
+            // Load sprites for bat and cart
+            batSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/bat.aseprite");
+            cartSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/cart.aseprite");
         }
 
         public void Enter()
@@ -100,7 +107,8 @@ namespace ProjectZeus.Core.Levels
                 Position = new Vector2(100, GameConstants.BaseScreenSize.Y - 140),
                 Velocity = new Vector2(40, 0),
                 MinX = 60,
-                MaxX = 220
+                MaxX = 220,
+                Sprite = cartSprite
             });
 
             carts.Add(new MineCart
@@ -108,7 +116,8 @@ namespace ProjectZeus.Core.Levels
                 Position = new Vector2(600, GameConstants.BaseScreenSize.Y - 220),
                 Velocity = new Vector2(-50, 0),
                 MinX = 560,
-                MaxX = 720
+                MaxX = 720,
+                Sprite = cartSprite
             });
 
             for (int i = 0; i < 4; i++)
@@ -117,7 +126,8 @@ namespace ProjectZeus.Core.Levels
                 {
                     Position = new Vector2(200 + i * 150, 150 + i * 40),
                     Velocity = new Vector2((float)(random.NextDouble() * 2 - 1) * 60f, (float)(random.NextDouble() * 2 - 1) * 60f),
-                    ChangeDirectionTimer = (float)random.NextDouble() * 2f
+                    ChangeDirectionTimer = (float)random.NextDouble() * 2f,
+                    Sprite = batSprite
                 });
             }
 
@@ -244,11 +254,7 @@ namespace ProjectZeus.Core.Levels
 
             foreach (var cart in carts)
             {
-                spriteBatch.Draw(platformTexture, cart.Bounds, new Color(139, 69, 19));
-                Rectangle wheel1 = new Rectangle(cart.Bounds.Left + 5, cart.Bounds.Bottom - 5, 8, 8);
-                Rectangle wheel2 = new Rectangle(cart.Bounds.Right - 13, cart.Bounds.Bottom - 5, 8, 8);
-                spriteBatch.Draw(platformTexture, wheel1, Color.Black);
-                spriteBatch.Draw(platformTexture, wheel2, Color.Black);
+                cart.Draw(spriteBatch, platformTexture, gameTime);
             }
 
             float flickerTime = (float)gameTime.TotalGameTime.TotalSeconds;
@@ -268,15 +274,9 @@ namespace ProjectZeus.Core.Levels
                 spriteBatch.Draw(platformTexture, glowRect, new Color((byte)255, (byte)215, (byte)0, (byte)100));
             }
 
-            float wingTime = (float)gameTime.TotalGameTime.TotalSeconds;
             foreach (var bat in bats)
             {
-                spriteBatch.Draw(platformTexture, bat.Bounds, new Color(80, 60, 90));
-                float wingFlap = (float)Math.Sin(wingTime * 10f) * 5f;
-                Rectangle leftWing = new Rectangle(bat.Bounds.Left - 8 + (int)wingFlap, bat.Bounds.Top + 5, 8, 5);
-                Rectangle rightWing = new Rectangle(bat.Bounds.Right - (int)wingFlap, bat.Bounds.Top + 5, 8, 5);
-                spriteBatch.Draw(platformTexture, leftWing, new Color(60, 50, 70));
-                spriteBatch.Draw(platformTexture, rightWing, new Color(60, 50, 70));
+                bat.Draw(spriteBatch, platformTexture, gameTime);
             }
 
             DrawingHelpers.DrawPortal(spriteBatch, portalTexture, exitRect, gameTime, new Color(100, 50, 200));
