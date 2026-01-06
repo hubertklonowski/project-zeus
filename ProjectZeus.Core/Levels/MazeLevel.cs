@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using ProjectZeus.Core.Entities;
 using ProjectZeus.Core.Rendering;
+using ProjectZeus.Core.Constants;
 using AsepriteDotNet.Aseprite;
 using AsepriteDotNet.IO;
 using MonoGame.Aseprite;
@@ -82,12 +83,12 @@ namespace ProjectZeus.Core
             solidTexture.SetData(new[] { Color.White });
             
             // Load the aseprite textures
-            hedgeTexture = LoadAsepriteTexture(graphicsDevice, "Content/Sprites/hedge.aseprite");
-            sandTileTexture = LoadAsepriteTexture(graphicsDevice, "Content/Sprites/sandtile.aseprite");
+            hedgeTexture = LoadAsepriteTexture(graphicsDevice, AssetPaths.Hedge);
+            sandTileTexture = LoadAsepriteTexture(graphicsDevice, AssetPaths.SandTile);
             
             // Load sprites with animation support
-            minotaurSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/minotaur.aseprite");
-            grapesSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/grapes.aseprite");
+            minotaurSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Minotaur);
+            grapesSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Grapes);
             
             // Fallback to created textures if aseprite files are not available
             if (hedgeTexture == null)

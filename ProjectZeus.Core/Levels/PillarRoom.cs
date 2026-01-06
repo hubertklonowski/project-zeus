@@ -55,7 +55,7 @@ namespace ProjectZeus.Core.Levels
             skyTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(135, 206, 235));
             
             // Load portal texture from vase.aseprite using AsepriteSprite loader
-            var vaseSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/vase.aseprite");
+            var vaseSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Vase);
             if (vaseSprite != null && vaseSprite.IsLoaded)
             {
                 // Use frame 0 (idle position) as the portal texture
@@ -69,7 +69,7 @@ namespace ProjectZeus.Core.Levels
             }
 
             // Load maze item sprite (grapes)
-            mazeItemSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/grapes.aseprite");
+            mazeItemSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Grapes);
 
             SetupPillars();
             SetupPortals();

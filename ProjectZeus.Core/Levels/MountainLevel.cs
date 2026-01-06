@@ -7,6 +7,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Aseprite;
 using ProjectZeus.Core.Rendering;
+using ProjectZeus.Core.Constants;
 
 namespace ProjectZeus.Core
 {
@@ -77,10 +78,10 @@ namespace ProjectZeus.Core
             this.font = font;
             
             // Load goat sprite
-            goatSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/goat.aseprite");
+            goatSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Goat);
             
             // Load rock sprite for projectiles
-            rockSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/rock.aseprite");
+            rockSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Rock);
             
             // Build the mountain structure with platforms
             SetupMountain();

@@ -64,9 +64,9 @@ namespace ProjectZeus.Core.Levels
             backgroundTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(20, 15, 30));
             
             // Load sprites for bat and cart
-            batSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/bat.aseprite");
-            cartSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/cart.aseprite");
-            stalactiteSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/stalactite.aseprite");
+            batSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Bat);
+            cartSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Cart);
+            stalactiteSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Stalactite);
         }
 
         public void Enter()
