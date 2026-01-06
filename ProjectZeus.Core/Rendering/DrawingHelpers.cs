@@ -20,29 +20,56 @@ namespace ProjectZeus.Core.Rendering
 
             float portalTime = (float)gameTime.TotalGameTime.TotalSeconds;
             float pulse = (float)(Math.Sin(portalTime * GameConstants.PortalPulseFrequency) * GameConstants.PortalPulseAmplitude + GameConstants.PortalPulseOffset);
-            float fastPulse = (float)Math.Sin(portalTime * GameConstants.PortalPulseFrequency * 2f) * 0.5f + 0.5f;
 
-            Color portalColor1 = new Color(
-                (byte)(GameConstants.PortalOuterRed * pulse), 
-                (byte)(GameConstants.PortalOuterGreen * pulse), 
-                (byte)(GameConstants.PortalOuterBlue * pulse));
-            Color portalColor2 = new Color(
-                (byte)(GameConstants.PortalInnerRed * fastPulse), 
-                (byte)(GameConstants.PortalInnerGreen * fastPulse), 
-                (byte)(GameConstants.PortalInnerBlue * fastPulse));
+            // If we have a 1x1 white texture (fallback), draw the old multi-layer portal effect
+            if (portalTexture.Width == 1 && portalTexture.Height == 1)
+            {
+                float fastPulse = (float)Math.Sin(portalTime * GameConstants.PortalPulseFrequency * 2f) * 0.5f + 0.5f;
 
-            spriteBatch.Draw(portalTexture, portalRect, baseColor * pulse);
+                Color portalColor1 = new Color(
+                    (byte)(GameConstants.PortalOuterRed * pulse), 
+                    (byte)(GameConstants.PortalOuterGreen * pulse), 
+                    (byte)(GameConstants.PortalOuterBlue * pulse));
+                Color portalColor2 = new Color(
+                    (byte)(GameConstants.PortalInnerRed * fastPulse), 
+                    (byte)(GameConstants.PortalInnerGreen * fastPulse), 
+                    (byte)(GameConstants.PortalInnerBlue * fastPulse));
 
-            Rectangle innerRect = portalRect;
-            innerRect.Inflate(-8, -8);
-            spriteBatch.Draw(portalTexture, innerRect, portalColor1);
+                spriteBatch.Draw(portalTexture, portalRect, baseColor * pulse);
 
-            Rectangle coreRect = portalRect;
-            coreRect.Inflate(-16, -16);
-            spriteBatch.Draw(portalTexture, coreRect, portalColor2);
+                Rectangle innerRect = portalRect;
+                innerRect.Inflate(-8, -8);
+                spriteBatch.Draw(portalTexture, innerRect, portalColor1);
 
-            DrawRectangleOutline(spriteBatch, portalTexture, portalRect, 
-                new Color(GameConstants.PortalOuterRed, GameConstants.PortalOuterGreen, GameConstants.PortalOuterBlue));
+                Rectangle coreRect = portalRect;
+                coreRect.Inflate(-16, -16);
+                spriteBatch.Draw(portalTexture, coreRect, portalColor2);
+
+                DrawRectangleOutline(spriteBatch, portalTexture, portalRect, 
+                    new Color(GameConstants.PortalOuterRed, GameConstants.PortalOuterGreen, GameConstants.PortalOuterBlue));
+            }
+            else
+            {
+                // For actual sprite textures like vase.aseprite, draw them with consistent sizing and ground placement
+                
+                // Define a standard vase size that works well for all portals
+                const int standardVaseWidth = 48;
+                const int standardVaseHeight = 64;
+                
+                // Calculate the ground level (bottom of the portal rect represents ground level)
+                int groundY = portalRect.Bottom;
+                
+                // Position vase on the ground, centered horizontally within the portal area
+                Rectangle spriteRect = new Rectangle(
+                    portalRect.X + (portalRect.Width - standardVaseWidth) / 2,
+                    groundY - standardVaseHeight,
+                    standardVaseWidth,
+                    standardVaseHeight);
+
+                // Add a subtle pulsing effect to the sprite color
+                Color spriteColor = Color.White * (0.8f + pulse * 0.2f);
+                spriteBatch.Draw(portalTexture, spriteRect, spriteColor);
+            }
         }
 
         /// <summary>
