@@ -35,7 +35,8 @@ namespace ProjectZeus.Core
         // Minotaur
         private Vector2 minotaurPosition;
         private Vector2 minotaurVelocity;
-        private readonly Vector2 minotaurSize = new Vector2(28, 28);
+        private readonly float minotaurScale = 0.75f; // Scale minotaur to match player size
+        private readonly Vector2 minotaurCollisionSize = new Vector2(24, 28); // Match player collision size
         private bool minotaurActive;
         private float minotaurTimer;
         private const float minotaurLifetime = 15f; // Minotaur disappears after 15 seconds
@@ -54,7 +55,7 @@ namespace ProjectZeus.Core
         private SpriteFont font;
         
         // Visibility (slightly smaller radius to force more exploration)
-        private const int visibilityRadius = 3; // cells visible around player
+        private const int visibilityRadius = 13; // cells visible around player
         
         // Configuration constants
         private const float minItemDistanceFromPlayer = 500f; // Item is well hidden but still reachable
@@ -518,8 +519,8 @@ namespace ProjectZeus.Core
                 
                 if (!walls[x, y])
                 {
-                    Vector2 spawnPos = new Vector2(x * cellSize + cellSize / 2 - minotaurSize.X / 2,
-                                                   y * cellSize + cellSize / 2 - minotaurSize.Y / 2);
+                    Vector2 spawnPos = new Vector2(x * cellSize + cellSize / 2 - minotaurCollisionSize.X / 2,
+                                                   y * cellSize + cellSize / 2 - minotaurCollisionSize.Y / 2);
                     float distance = Vector2.Distance(playerPosition, spawnPos);
                     
                     if (distance > minMinotaurSpawnDistance) // Don't spawn too close to player
@@ -540,7 +541,7 @@ namespace ProjectZeus.Core
             Vector2 newPos = minotaurPosition + minotaurVelocity * dt;
             
             // Check collision with walls
-            if (CheckWallCollision(newPos, minotaurSize))
+            if (CheckWallCollision(newPos, minotaurCollisionSize))
             {
                 // Bounce in a random direction
                 float angle = (float)(random.NextDouble() * Math.PI * 2);
@@ -562,7 +563,7 @@ namespace ProjectZeus.Core
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y,
                                                  (int)playerCollisionSize.X, (int)playerCollisionSize.Y);
             Rectangle minotaurRect = new Rectangle((int)minotaurPosition.X, (int)minotaurPosition.Y,
-                                                   (int)minotaurSize.X, (int)minotaurSize.Y);
+                                                   (int)minotaurCollisionSize.X, (int)minotaurCollisionSize.Y);
             
             if (playerRect.Intersects(minotaurRect))
             {
@@ -696,8 +697,8 @@ namespace ProjectZeus.Core
             // Draw minotaur if active and visible
             if (minotaurActive)
             {
-                int minotaurCellX = (int)((minotaurPosition.X + minotaurSize.X / 2) / cellSize);
-                int minotaurCellY = (int)((minotaurPosition.Y + minotaurSize.Y / 2) / cellSize);
+                int minotaurCellX = (int)((minotaurPosition.X + minotaurCollisionSize.X / 2) / cellSize);
+                int minotaurCellY = (int)((minotaurPosition.Y + minotaurCollisionSize.Y / 2) / cellSize);
                 int minotaurDx = Math.Abs(minotaurCellX - playerCellX);
                 int minotaurDy = Math.Abs(minotaurCellY - playerCellY);
                 
@@ -708,25 +709,35 @@ namespace ProjectZeus.Core
                         // Check if minotaur is moving
                         bool isMoving = minotaurVelocity.LengthSquared() > 0;
                         
-                        // Draw minotaur sprite centered at position
-                        Vector2 drawPos = new Vector2(
-                            minotaurPosition.X + minotaurSize.X / 2 - minotaurSprite.Size.X / 2,
-                            minotaurPosition.Y + minotaurSize.Y / 2 - minotaurSprite.Size.Y / 2);
+                        // Calculate scaled sprite size
+                        Vector2 scaledSpriteSize = minotaurSprite.Size * minotaurScale;
+                        
+                        // Draw minotaur sprite scaled and centered on collision box
+                        Rectangle destRect = new Rectangle(
+                            (int)(minotaurPosition.X + minotaurCollisionSize.X / 2 - scaledSpriteSize.X / 2),
+                            (int)(minotaurPosition.Y + minotaurCollisionSize.Y - scaledSpriteSize.Y),
+                            (int)scaledSpriteSize.X,
+                            (int)scaledSpriteSize.Y);
                         
                         // Flip sprite based on movement direction
                         SpriteEffects flip = minotaurVelocity.X < 0 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
-                        minotaurSprite.Draw(spriteBatch, drawPos, isMoving, gameTime, Color.White, 10f, flip);
+                        
+                        var texture = minotaurSprite.GetFrameTexture(isMoving, gameTime, 10f);
+                        if (texture != null)
+                        {
+                            spriteBatch.Draw(texture, destRect, null, Color.White, 0f, Vector2.Zero, flip, 0f);
+                        }
                     }
                     else
                     {
                         // Fallback to colored rectangle
                         Rectangle minotaurRect = new Rectangle((int)minotaurPosition.X, (int)minotaurPosition.Y,
-                                                               (int)minotaurSize.X, (int)minotaurSize.Y);
+                                                               (int)minotaurCollisionSize.X, (int)minotaurCollisionSize.Y);
                         spriteBatch.Draw(solidTexture, minotaurRect, new Color(139, 69, 19));
                         DrawRectangleOutline(spriteBatch, minotaurRect, new Color(101, 51, 15));
                         
                         Rectangle horn1 = new Rectangle((int)minotaurPosition.X + 2, (int)minotaurPosition.Y, 6, 8);
-                        Rectangle horn2 = new Rectangle((int)minotaurPosition.X + (int)minotaurSize.X - 8, (int)minotaurPosition.Y, 6, 8);
+                        Rectangle horn2 = new Rectangle((int)minotaurPosition.X + (int)minotaurCollisionSize.X - 8, (int)minotaurPosition.Y, 6, 8);
                         spriteBatch.Draw(solidTexture, horn1, Color.White);
                         spriteBatch.Draw(solidTexture, horn2, Color.White);
                     }
