@@ -73,21 +73,8 @@ namespace ProjectZeus.Core.Entities
             {
                 Console.WriteLine($"Could not load adonis.aseprite: {ex.Message}");
                 Console.WriteLine($"Stack: {ex.StackTrace}");
-                adonisTexture = CreatePlaceholderTexture(graphicsDevice);
-                spriteWidth = 32;
-                spriteHeight = 48;
-                isLoaded = true;
+                isLoaded = false;
             }
-        }
-
-        private Texture2D CreatePlaceholderTexture(GraphicsDevice graphicsDevice)
-        {
-            var texture = new Texture2D(graphicsDevice, spriteWidth, spriteHeight);
-            Color[] data = new Color[spriteWidth * spriteHeight];
-            for (int i = 0; i < data.Length; i++)
-                data[i] = new Color(255, 220, 180);
-            texture.SetData(data);
-            return texture;
         }
 
         public void Update(GameTime gameTime)

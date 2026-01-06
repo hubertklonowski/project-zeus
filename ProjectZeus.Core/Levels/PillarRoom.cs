@@ -61,12 +61,6 @@ namespace ProjectZeus.Core.Levels
                 // Use frame 0 (idle position) as the portal texture
                 portalTexture = vaseSprite.GetFrameTexture(0);
             }
-            
-            if (portalTexture == null)
-            {
-                // Fallback to solid texture if aseprite loading fails
-                portalTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, Color.White);
-            }
 
             // Load maze item sprite (grapes)
             mazeItemSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Grapes);
