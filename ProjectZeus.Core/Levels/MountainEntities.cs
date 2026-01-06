@@ -9,6 +9,7 @@ namespace ProjectZeus.Core.Levels
     {
         public Vector2 Position { get; set; }
         public Vector2 Size { get; set; }
+        public Color Color { get; set; }
         public Rectangle Bounds => new Rectangle((int)Position.X, (int)Position.Y, (int)Size.X, (int)Size.Y);
     }
 
@@ -18,8 +19,10 @@ namespace ProjectZeus.Core.Levels
     public class Rock
     {
         public Vector2 Position { get; set; }
+        public Vector2 Size { get; set; }
         public Vector2 Velocity { get; set; }
-        public float Size { get; set; }
+        public float Rotation { get; set; }
+        public float RotationSpeed { get; set; }
         public bool Active { get; set; }
     }
 }

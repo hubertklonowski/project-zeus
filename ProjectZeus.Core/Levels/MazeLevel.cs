@@ -3,10 +3,11 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Content;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using ProjectZeus.Core.Entities;
 using ProjectZeus.Core.Rendering;
+using ProjectZeus.Core.Constants;
+using ProjectZeus.Core.Levels;
 using AsepriteDotNet.Aseprite;
 using AsepriteDotNet.IO;
 using MonoGame.Aseprite;
@@ -32,16 +33,8 @@ namespace ProjectZeus.Core
         private Vector2 itemPosition;
         private bool itemCollected;
         
-        // Minotaur
-        private Vector2 minotaurPosition;
-        private Vector2 minotaurVelocity;
-        private readonly float minotaurScale = 0.75f; // Scale minotaur to match player size
-        private readonly Vector2 minotaurCollisionSize = new Vector2(24, 28); // Match player collision size
-        private bool minotaurActive;
-        private float minotaurTimer;
-        private const float minotaurLifetime = 15f; // Minotaur disappears after 15 seconds
-        private const float minotaurSpawnDelay = 5f; // Respawn after 5 seconds
-        private Random random;
+        // Minotaur controller
+        private MinotaurController minotaurController;
         
         // Entrance/exit position
         private Vector2 entrancePosition;
@@ -59,11 +52,11 @@ namespace ProjectZeus.Core
         
         // Configuration constants
         private const float minItemDistanceFromPlayer = 500f; // Item is well hidden but still reachable
-        private const float minMinotaurSpawnDistance = 150f;
-        private const double minotaurDirectionChangeChance = 0.02; // 2% chance per frame
         
         public bool IsCompleted { get; private set; }
         public bool HasItem { get; private set; }
+        
+        private Random random;
         
         public MazeLevel()
         {
@@ -71,8 +64,11 @@ namespace ProjectZeus.Core
             itemCollected = false;
             IsCompleted = false;
             HasItem = false;
-            minotaurActive = false;
-            minotaurTimer = minotaurSpawnDelay;
+            
+            // Initialize minotaur controller
+            Vector2 minotaurCollisionSize = new Vector2(24, 28);
+            float minotaurScale = 0.75f;
+            minotaurController = new MinotaurController(minotaurCollisionSize, minotaurScale, random);
         }
         
         public void LoadContent(GraphicsDevice graphicsDevice, SpriteFont spriteFont)
@@ -82,18 +78,12 @@ namespace ProjectZeus.Core
             solidTexture.SetData(new[] { Color.White });
             
             // Load the aseprite textures
-            hedgeTexture = LoadAsepriteTexture(graphicsDevice, "Content/Sprites/hedge.aseprite");
-            sandTileTexture = LoadAsepriteTexture(graphicsDevice, "Content/Sprites/sandtile.aseprite");
+            hedgeTexture = LoadAsepriteTexture(graphicsDevice, AssetPaths.Hedge);
+            sandTileTexture = LoadAsepriteTexture(graphicsDevice, AssetPaths.SandTile);
             
             // Load sprites with animation support
-            minotaurSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/minotaur.aseprite");
-            grapesSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/grapes.aseprite");
-            
-            // Fallback to created textures if aseprite files are not available
-            if (hedgeTexture == null)
-                hedgeTexture = CreateHedgeTexture(graphicsDevice);
-            if (sandTileTexture == null)
-                sandTileTexture = CreateSandTileTexture(graphicsDevice);
+            minotaurSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Minotaur);
+            grapesSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Grapes);
             
             font = spriteFont;
             
@@ -119,154 +109,10 @@ namespace ProjectZeus.Core
             }
         }
         
-        private Texture2D CreateHedgeTexture(GraphicsDevice graphicsDevice)
-        {
-            Texture2D texture = new Texture2D(graphicsDevice, cellSize, cellSize);
-            Color[] data = new Color[cellSize * cellSize];
-            
-            // Create a hedge-like pattern with green colors
-            Color darkGreen = new Color(34, 100, 34);
-            Color mediumGreen = new Color(50, 130, 50);
-            Color lightGreen = new Color(70, 150, 70);
-            
-            for (int y = 0; y < cellSize; y++)
-            {
-                for (int x = 0; x < cellSize; x++)
-                {
-                    int index = y * cellSize + x;
-                    
-                    // Create a hedge pattern with some variation
-                    int variation = (x + y) % 3;
-                    if (variation == 0)
-                        data[index] = darkGreen;
-                    else if (variation == 1)
-                        data[index] = mediumGreen;
-                    else
-                        data[index] = lightGreen;
-                    
-                    // Add some darker spots for texture
-                    if ((x + y) % 5 == 0 || (x * 2 + y) % 7 == 0)
-                        data[index] = darkGreen;
-                }
-            }
-            
-            texture.SetData(data);
-            return texture;
-        }
-        
-        private Texture2D CreateSandTileTexture(GraphicsDevice graphicsDevice)
-        {
-            Texture2D texture = new Texture2D(graphicsDevice, cellSize, cellSize);
-            Color[] data = new Color[cellSize * cellSize];
-            
-            // Create a sandy pattern with tan/brown colors
-            Color lightSand = new Color(194, 178, 128);
-            Color mediumSand = new Color(160, 144, 104);
-            Color darkSand = new Color(140, 124, 84);
-            
-            for (int y = 0; y < cellSize; y++)
-            {
-                for (int x = 0; x < cellSize; x++)
-                {
-                    int index = y * cellSize + x;
-                    
-                    // Create a sandy pattern with subtle variation
-                    int variation = (x * 3 + y * 2) % 4;
-                    if (variation == 0)
-                        data[index] = lightSand;
-                    else if (variation == 1 || variation == 2)
-                        data[index] = mediumSand;
-                    else
-                        data[index] = darkSand;
-                    
-                    // Add some speckles for texture
-                    if ((x * 7 + y * 5) % 11 == 0)
-                        data[index] = darkSand;
-                }
-            }
-            
-            texture.SetData(data);
-            return texture;
-        }
-        
         private void GenerateMaze()
         {
-            // Initialize all cells as walls
-            walls = new bool[mazeWidth, mazeHeight];
-            for (int x = 0; x < mazeWidth; x++)
-            {
-                for (int y = 0; y < mazeHeight; y++)
-                {
-                    walls[x, y] = true;
-                }
-            }
-            
-            // Use recursive backtracking to generate maze
-            Stack<Point> stack = new Stack<Point>();
-            Point start = new Point(1, 1);
-            walls[start.X, start.Y] = false;
-            stack.Push(start);
-            
-            while (stack.Count > 0)
-            {
-                Point current = stack.Peek();
-                List<Point> unvisitedNeighbors = GetUnvisitedNeighbors(current);
-                
-                if (unvisitedNeighbors.Count > 0)
-                {
-                    Point next = unvisitedNeighbors[random.Next(unvisitedNeighbors.Count)];
-                    
-                    // Remove wall between current and next
-                    int wallX = (current.X + next.X) / 2;
-                    int wallY = (current.Y + next.Y) / 2;
-                    walls[wallX, wallY] = false;
-                    walls[next.X, next.Y] = false;
-                    
-                    stack.Push(next);
-                }
-                else
-                {
-                    stack.Pop();
-                }
-            }
-            
-            // Ensure outer border is always walls to prevent going off-screen
-            for (int x = 0; x < mazeWidth; x++)
-            {
-                walls[x, 0] = true;
-                walls[x, mazeHeight - 1] = true;
-            }
-            for (int y = 0; y < mazeHeight; y++)
-            {
-                walls[0, y] = true;
-                walls[mazeWidth - 1, y] = true;
-            }
-        }
-        
-        private List<Point> GetUnvisitedNeighbors(Point cell)
-        {
-            List<Point> neighbors = new List<Point>();
-            
-            // Check all four directions (2 cells away)
-            Point[] directions = new[]
-            {
-                new Point(cell.X - 2, cell.Y),
-                new Point(cell.X + 2, cell.Y),
-                new Point(cell.X, cell.Y - 2),
-                new Point(cell.X, cell.Y + 2)
-            };
-            
-            foreach (Point dir in directions)
-            {
-                if (dir.X > 0 && dir.X < mazeWidth - 1 &&
-                    dir.Y > 0 && dir.Y < mazeHeight - 1 &&
-                    walls[dir.X, dir.Y])
-                {
-                    neighbors.Add(dir);
-                }
-            }
-            
-            return neighbors;
+            var generator = new MazeGenerator(mazeWidth, mazeHeight, random);
+            walls = generator.Generate();
         }
         
         private void PlacePlayerAndItem()
@@ -323,7 +169,7 @@ namespace ProjectZeus.Core
                     float distance = Vector2.Distance(playerPosition, itemPos);
                     
                     if (distance > minItemDistanceFromPlayer &&
-                        IsReachableCell(playerCell, new Point(itemX, itemY)))
+                        MazeGenerator.IsReachable(playerCell, new Point(itemX, itemY), walls, mazeWidth, mazeHeight))
                     {
                         itemPosition = itemPos;
                         return;
@@ -343,7 +189,7 @@ namespace ProjectZeus.Core
                     if (!walls[x, y])
                     {
                         Point target = new Point(x, y);
-                        if (IsReachableCell(playerCell, target))
+                        if (MazeGenerator.IsReachable(playerCell, target, walls, mazeWidth, mazeHeight))
                         {
                             Vector2 cellCenter = new Vector2(x * cellSize + cellSize / 2,
                                                              y * cellSize + cellSize / 2);
@@ -360,43 +206,6 @@ namespace ProjectZeus.Core
             
             itemPosition = new Vector2(bestCell.X * cellSize + cellSize / 2,
                                        bestCell.Y * cellSize + cellSize / 2);
-        }
-        
-        // Simple BFS over passage cells to ensure there is a walkable path between two cells
-        private bool IsReachableCell(Point start, Point target)
-        {
-            if (walls[target.X, target.Y])
-                return false;
-            
-            bool[,] visited = new bool[mazeWidth, mazeHeight];
-            Queue<Point> queue = new Queue<Point>();
-            queue.Enqueue(start);
-            visited[start.X, start.Y] = true;
-            
-            int[] dx = { -1, 1, 0, 0 };
-            int[] dy = { 0, 0, -1, 1 };
-            
-            while (queue.Count > 0)
-            {
-                Point current = queue.Dequeue();
-                if (current == target)
-                    return true;
-                
-                for (int dir = 0; dir < 4; dir++)
-                {
-                    int nx = current.X + dx[dir];
-                    int ny = current.Y + dy[dir];
-                    
-                    if (nx > 0 && nx < mazeWidth - 1 && ny > 0 && ny < mazeHeight - 1 &&
-                        !walls[nx, ny] && !visited[nx, ny])
-                    {
-                        visited[nx, ny] = true;
-                        queue.Enqueue(new Point(nx, ny));
-                    }
-                }
-            }
-            
-            return false;
         }
         
         public void Update(GameTime gameTime, KeyboardState keyboardState)
@@ -448,10 +257,9 @@ namespace ProjectZeus.Core
                 }
             }
             
-            // Maze already fits inside the window; no additional clamping needed.
-            
             // Update minotaur
-            UpdateMinotaur(dt);
+            minotaurController.Update(dt, playerPosition, walls, cellSize, mazeWidth, mazeHeight);
+            playerPosition = minotaurController.HandlePlayerCollision(playerPosition, playerCollisionSize, dt, walls, cellSize, mazeWidth, mazeHeight);
             
             // Check item pickup with E key
             if (!itemCollected && keyboardState.IsKeyDown(Keys.E))
@@ -476,108 +284,6 @@ namespace ProjectZeus.Core
                 {
                     IsCompleted = true;
                     return;
-                }
-            }
-        }
-        
-        private void UpdateMinotaur(float dt)
-        {
-            minotaurTimer -= dt;
-            
-            if (!minotaurActive)
-            {
-                // Check if it's time to spawn minotaur
-                if (minotaurTimer <= 0)
-                {
-                    SpawnMinotaur();
-                    minotaurTimer = minotaurLifetime;
-                    minotaurActive = true;
-                }
-            }
-            else
-            {
-                // Minotaur is active, move it
-                MoveMinotaur(dt);
-                
-                // Check if it's time for minotaur to disappear
-                if (minotaurTimer <= 0)
-                {
-                    minotaurActive = false;
-                    minotaurTimer = minotaurSpawnDelay;
-                }
-            }
-        }
-        
-        private void SpawnMinotaur()
-        {
-            // Spawn minotaur in a random passage away from player
-            int attempts = 0;
-            while (attempts < 50)
-            {
-                int x = random.Next(1, mazeWidth - 1);
-                int y = random.Next(1, mazeHeight - 1);
-                
-                if (!walls[x, y])
-                {
-                    Vector2 spawnPos = new Vector2(x * cellSize + cellSize / 2 - minotaurCollisionSize.X / 2,
-                                                   y * cellSize + cellSize / 2 - minotaurCollisionSize.Y / 2);
-                    float distance = Vector2.Distance(playerPosition, spawnPos);
-                    
-                    if (distance > minMinotaurSpawnDistance) // Don't spawn too close to player
-                    {
-                        minotaurPosition = spawnPos;
-                        // Random initial direction
-                        float angle = (float)(random.NextDouble() * Math.PI * 2);
-                        minotaurVelocity = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * 80f;
-                        break;
-                    }
-                }
-                attempts++;
-            }
-        }
-        
-        private void MoveMinotaur(float dt)
-        {
-            Vector2 newPos = minotaurPosition + minotaurVelocity * dt;
-            
-            // Check collision with walls
-            if (CheckWallCollision(newPos, minotaurCollisionSize))
-            {
-                // Bounce in a random direction
-                float angle = (float)(random.NextDouble() * Math.PI * 2);
-                minotaurVelocity = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * 80f;
-            }
-            else
-            {
-                minotaurPosition = newPos;
-                
-                // Occasionally change direction randomly
-                if (random.NextDouble() < minotaurDirectionChangeChance)
-                {
-                    float angle = (float)(random.NextDouble() * Math.PI * 2);
-                    minotaurVelocity = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle)) * 80f;
-                }
-            }
-            
-            // Check collision with player
-            Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y,
-                                                 (int)playerCollisionSize.X, (int)playerCollisionSize.Y);
-            Rectangle minotaurRect = new Rectangle((int)minotaurPosition.X, (int)minotaurPosition.Y,
-                                                   (int)minotaurCollisionSize.X, (int)minotaurCollisionSize.Y);
-            
-            if (playerRect.Intersects(minotaurRect))
-            {
-                // Push player away from minotaur
-                Vector2 pushDir = playerPosition - minotaurPosition;
-                if (pushDir.LengthSquared() > 0)
-                    pushDir.Normalize();
-                
-                Vector2 pushedPosition = playerPosition + pushDir * 50f * dt;
-                
-                // Only apply push if it doesn't push player into a wall
-                if (!CheckWallCollision(pushedPosition, playerCollisionSize))
-                {
-                    playerPosition = pushedPosition;
                 }
             }
         }
@@ -684,19 +390,16 @@ namespace ProjectZeus.Core
                             itemPosition.Y - grapesSprite.Size.Y / 2);
                         grapesSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime, Color.White);
                     }
-                    else
-                    {
-                        // Fallback to colored rectangle
-                        Rectangle itemRect = new Rectangle((int)(itemPosition.X - 12), (int)(itemPosition.Y - 12), 24, 24);
-                        spriteBatch.Draw(solidTexture, itemRect, Color.Gold);
-                        DrawRectangleOutline(spriteBatch, itemRect, Color.Orange);
-                    }
                 }
             }
             
             // Draw minotaur if active and visible
-            if (minotaurActive)
+            if (minotaurController.IsActive)
             {
+                Vector2 minotaurPosition = minotaurController.Position;
+                Vector2 minotaurVelocity = minotaurController.Velocity;
+                Vector2 minotaurCollisionSize = minotaurController.CollisionSize;
+                
                 int minotaurCellX = (int)((minotaurPosition.X + minotaurCollisionSize.X / 2) / cellSize);
                 int minotaurCellY = (int)((minotaurPosition.Y + minotaurCollisionSize.Y / 2) / cellSize);
                 int minotaurDx = Math.Abs(minotaurCellX - playerCellX);
@@ -710,7 +413,7 @@ namespace ProjectZeus.Core
                         bool isMoving = minotaurVelocity.LengthSquared() > 0;
                         
                         // Calculate scaled sprite size
-                        Vector2 scaledSpriteSize = minotaurSprite.Size * minotaurScale;
+                        Vector2 scaledSpriteSize = minotaurSprite.Size * minotaurController.Scale;
                         
                         // Draw minotaur sprite scaled and centered on collision box
                         Rectangle destRect = new Rectangle(
@@ -728,19 +431,6 @@ namespace ProjectZeus.Core
                             spriteBatch.Draw(texture, destRect, null, Color.White, 0f, Vector2.Zero, flip, 0f);
                         }
                     }
-                    else
-                    {
-                        // Fallback to colored rectangle
-                        Rectangle minotaurRect = new Rectangle((int)minotaurPosition.X, (int)minotaurPosition.Y,
-                                                               (int)minotaurCollisionSize.X, (int)minotaurCollisionSize.Y);
-                        spriteBatch.Draw(solidTexture, minotaurRect, new Color(139, 69, 19));
-                        DrawRectangleOutline(spriteBatch, minotaurRect, new Color(101, 51, 15));
-                        
-                        Rectangle horn1 = new Rectangle((int)minotaurPosition.X + 2, (int)minotaurPosition.Y, 6, 8);
-                        Rectangle horn2 = new Rectangle((int)minotaurPosition.X + (int)minotaurCollisionSize.X - 8, (int)minotaurPosition.Y, 6, 8);
-                        spriteBatch.Draw(solidTexture, horn1, Color.White);
-                        spriteBatch.Draw(solidTexture, horn2, Color.White);
-                    }
                 }
             }
             
@@ -756,7 +446,6 @@ namespace ProjectZeus.Core
                 {
                     Rectangle entranceRect = new Rectangle((int)(entrancePosition.X - 14), (int)(entrancePosition.Y - 14), 28, 28);
                     spriteBatch.Draw(solidTexture, entranceRect, new Color(0, 255, 0, 128));
-                    DrawRectangleOutline(spriteBatch, entranceRect, Color.LimeGreen);
                 }
             }
             
@@ -779,14 +468,6 @@ namespace ProjectZeus.Core
 
                     grapesSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime, Color.White);
                 }
-                else
-                {
-                    // Fallback to colored rectangle if sprite is not available
-                    Rectangle carriedItemRect = new Rectangle((int)playerPosition.X + (int)playerCollisionSize.X / 2 - 10,
-                                                             (int)playerPosition.Y - 18, 20, 20);
-                    spriteBatch.Draw(solidTexture, carriedItemRect, Color.Gold);
-                    DrawRectangleOutline(spriteBatch, carriedItemRect, Color.Orange);
-                }
             }
             
             // Draw UI
@@ -796,7 +477,7 @@ namespace ProjectZeus.Core
             
             spriteBatch.DrawString(font, instructions, new Vector2(10, 10), Color.Yellow);
             
-            if (minotaurActive)
+            if (minotaurController.IsActive)
             {
                 string warning = "MINOTAUR NEARBY!";
                 Vector2 warningSize = font.MeasureString(warning);
@@ -804,15 +485,6 @@ namespace ProjectZeus.Core
             }
             
             spriteBatch.End();
-        }
-        
-        private void DrawRectangleOutline(SpriteBatch spriteBatch, Rectangle rect, Color color)
-        {
-            int thickness = 2;
-            spriteBatch.Draw(solidTexture, new Rectangle(rect.X, rect.Y, rect.Width, thickness), color);
-            spriteBatch.Draw(solidTexture, new Rectangle(rect.X, rect.Bottom - thickness, rect.Width, thickness), color);
-            spriteBatch.Draw(solidTexture, new Rectangle(rect.X, rect.Y, thickness, rect.Height), color);
-            spriteBatch.Draw(solidTexture, new Rectangle(rect.Right - thickness, rect.Y, thickness, rect.Height), color);
         }
     }
 }

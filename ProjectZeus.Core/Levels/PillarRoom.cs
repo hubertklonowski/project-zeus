@@ -14,14 +14,6 @@ namespace ProjectZeus.Core.Levels
     /// </summary>
     public class PillarRoom
     {
-        public enum PillarItemType
-        {
-            None,
-            Maze,
-            Mine,
-            Mountain
-        }
-
         private Pillar[] pillars;
         private Portal mazePortal;
         private Portal minePortal;
@@ -55,21 +47,15 @@ namespace ProjectZeus.Core.Levels
             skyTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(135, 206, 235));
             
             // Load portal texture from vase.aseprite using AsepriteSprite loader
-            var vaseSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/vase.aseprite");
+            var vaseSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Vase);
             if (vaseSprite != null && vaseSprite.IsLoaded)
             {
                 // Use frame 0 (idle position) as the portal texture
                 portalTexture = vaseSprite.GetFrameTexture(0);
             }
-            
-            if (portalTexture == null)
-            {
-                // Fallback to solid texture if aseprite loading fails
-                portalTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, Color.White);
-            }
 
             // Load maze item sprite (grapes)
-            mazeItemSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/grapes.aseprite");
+            mazeItemSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Grapes);
 
             SetupPillars();
             SetupPortals();

@@ -13,11 +13,12 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Input.Touch;
 using Microsoft.Xna.Framework.Media;
-using Platformer2D;
 using ProjectZeus.Core.Constants;
 using ProjectZeus.Core.Entities;
 using ProjectZeus.Core.Levels;
 using ProjectZeus.Core.Rendering;
+using ProjectZeus.Core.Utilities;
+using ProjectZeus.Core.Game;
 
 namespace ProjectZeus.Core
 {
@@ -40,27 +41,8 @@ namespace ProjectZeus.Core
         private TouchCollection touchState;
         private VirtualGamePad virtualGamePad;
 
+        private SceneManager sceneManager;
         private AdonisPlayer player;
-        private PillarRoom pillarRoom;
-        private MineLevel mineLevel;
-        private MazeLevel mazeLevel;
-        private MountainLevel mountainLevel;
-        private ZeusFightScene zeusFightScene;
-
-        private bool hasCollectedMazeItem;
-        private bool hasCollectedMineItem;
-        private bool hasCollectedMountainItem;
-
-        private enum GameScene
-        {
-            PillarRoom,
-            MineLevel,
-            MazeLevel,
-            MountainLevel,
-            ZeusFight
-        }
-
-        private GameScene currentScene = GameScene.PillarRoom;
 
         public PlatformerGame()
         {
@@ -102,26 +84,25 @@ namespace ProjectZeus.Core
             player = new AdonisPlayer();
             player.LoadContent(GraphicsDevice);
 
-            pillarRoom = new PillarRoom();
+            var pillarRoom = new PillarRoom();
             pillarRoom.LoadContent(GraphicsDevice, hudFont);
 
-            mineLevel = new MineLevel();
+            var mineLevel = new MineLevel();
             mineLevel.LoadContent(GraphicsDevice, hudFont);
 
-            mazeLevel = new MazeLevel();
+            var mazeLevel = new MazeLevel();
             mazeLevel.LoadContent(GraphicsDevice, hudFont);
 
-            mountainLevel = new MountainLevel();
+            var mountainLevel = new MountainLevel();
             mountainLevel.LoadContent(GraphicsDevice, hudFont);
 
-            zeusFightScene = new ZeusFightScene();
+            var zeusFightScene = new ZeusFightScene();
             zeusFightScene.LoadContent(GraphicsDevice, hudFont);
+
+            sceneManager = new SceneManager(player, pillarRoom, mineLevel, mazeLevel, mountainLevel, zeusFightScene);
 
             ResetPlayerToPillarRoom();
             
-            hasCollectedMazeItem = false;
-            hasCollectedMineItem = false;
-            hasCollectedMountainItem = false;
             previousKeyboardState = Keyboard.GetState();
         }
 
@@ -157,54 +138,35 @@ namespace ProjectZeus.Core
 
             HandleInput(gameTime);
 
-            switch (currentScene)
+            switch (sceneManager.CurrentScene)
             {
-                case GameScene.ZeusFight:
-                    zeusFightScene.Update(gameTime);
+                case SceneManager.GameScene.ZeusFight:
+                    sceneManager.ZeusFightScene.Update(gameTime);
                     break;
 
-                case GameScene.MazeLevel:
-                    mazeLevel.Update(gameTime, keyboardState);
-                    if (mazeLevel.IsCompleted)
-                    {
-                        currentScene = GameScene.PillarRoom;
-                        hasCollectedMazeItem = mazeLevel.HasItem;
-                        if (hasCollectedMazeItem)
-                        {
-                            pillarRoom.MazePortal.IsActive = false;
-                            pillarRoom.CurrentCarriedItem = PillarRoom.PillarItemType.Maze;
-                        }
-                        mazeLevel = new MazeLevel();
-                        mazeLevel.LoadContent(GraphicsDevice, hudFont);
-                        ResetPlayerToPillarRoom();
-                    }
+                case SceneManager.GameScene.MazeLevel:
+                    sceneManager.MazeLevel.Update(gameTime, keyboardState);
+                    sceneManager.HandleMazeLevelCompletion(GraphicsDevice, hudFont, ResetPlayerToPillarRoom);
                     break;
 
-                case GameScene.MineLevel:
-                    mineLevel.Update(gameTime, keyboardState, previousKeyboardState);
-                    if (!mineLevel.IsActive)
+                case SceneManager.GameScene.MineLevel:
+                    sceneManager.MineLevel.Update(gameTime, keyboardState, previousKeyboardState);
+                    if (!sceneManager.MineLevel.IsActive)
                     {
-                        currentScene = GameScene.PillarRoom;
-                        if (mineLevel.HasCollectedItem)
-                        {
-                            hasCollectedMineItem = true;
-                            pillarRoom.MinePortal.IsActive = false;
-                            pillarRoom.CurrentCarriedItem = PillarRoom.PillarItemType.Mine;
-                        }
-                        ResetPlayerToPillarRoom();
+                        sceneManager.HandleMineLevelCompletion(ResetPlayerToPillarRoom);
                     }
                     else
                     {
-                        player.Position = mineLevel.PlayerPosition;
-                        player.Velocity = mineLevel.PlayerVelocity;
+                        player.Position = sceneManager.MineLevel.PlayerPosition;
+                        player.Velocity = sceneManager.MineLevel.PlayerVelocity;
                     }
                     break;
 
-                case GameScene.MountainLevel:
+                case SceneManager.GameScene.MountainLevel:
                     UpdateMountainLevel(gameTime);
                     break;
 
-                case GameScene.PillarRoom:
+                case SceneManager.GameScene.PillarRoom:
                     UpdatePillarRoom(gameTime);
                     break;
             }
@@ -247,7 +209,7 @@ namespace ProjectZeus.Core
                 player.IsOnGround = true;
             }
 
-            foreach (Pillar pillar in pillarRoom.Pillars)
+            foreach (Pillar pillar in sceneManager.PillarRoom.Pillars)
             {
                 Rectangle pillarRect = pillar.GetPillarRectangle();
                 Vector2 correctedPos;
@@ -264,45 +226,45 @@ namespace ProjectZeus.Core
             player.Position = tempPos;
             player.Update(gameTime);
 
-            bool hasAnyItem = hasCollectedMazeItem || hasCollectedMineItem || hasCollectedMountainItem;
+            bool hasAnyItem = sceneManager.HasCollectedMazeItem || sceneManager.HasCollectedMineItem || sceneManager.HasCollectedMountainItem;
             bool eKeyPressed = keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E);
 
-            if (eKeyPressed && hasAnyItem && pillarRoom.CurrentCarriedItem != PillarRoom.PillarItemType.None)
+            if (eKeyPressed && hasAnyItem && sceneManager.PillarRoom.CurrentCarriedItem != PillarItemType.None)
             {
-                if (pillarRoom.TryInsertItem(player.Position, playerSize))
+                if (sceneManager.PillarRoom.TryInsertItem(player.Position, playerSize))
                 {
-                    hasCollectedMazeItem = false;
-                    hasCollectedMineItem = false;
-                    hasCollectedMountainItem = false;
+                    sceneManager.HasCollectedMazeItem = false;
+                    sceneManager.HasCollectedMineItem = false;
+                    sceneManager.HasCollectedMountainItem = false;
                 }
             }
 
-            if (pillarRoom.MazePortal.Intersects(player.Bounds) && !hasCollectedMazeItem)
+            if (sceneManager.PillarRoom.MazePortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMazeItem)
             {
-                currentScene = GameScene.MazeLevel;
+                sceneManager.CurrentScene = SceneManager.GameScene.MazeLevel;
                 return;
             }
 
-            if (pillarRoom.MinePortal.Intersects(player.Bounds) && !hasCollectedMineItem)
+            if (sceneManager.PillarRoom.MinePortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMineItem)
             {
-                currentScene = GameScene.MineLevel;
-                mineLevel.Enter();
+                sceneManager.CurrentScene = SceneManager.GameScene.MineLevel;
+                sceneManager.MineLevel.Enter();
                 return;
             }
 
-            if (eKeyPressed && pillarRoom.MountainPortal.Intersects(player.Bounds) && !hasCollectedMountainItem)
+            if (eKeyPressed && sceneManager.PillarRoom.MountainPortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMountainItem)
             {
-                currentScene = GameScene.MountainLevel;
-                mountainLevel.Reset();
+                sceneManager.CurrentScene = SceneManager.GameScene.MountainLevel;
+                sceneManager.MountainLevel.Reset();
                 player.Position = new Vector2(60f, groundTop - playerSize.Y);
                 player.Velocity = Vector2.Zero;
                 player.IsOnGround = true;
                 return;
             }
 
-            if (pillarRoom.AllItemsInserted)
+            if (sceneManager.PillarRoom.AllItemsInserted)
             {
-                currentScene = GameScene.ZeusFight;
+                sceneManager.CurrentScene = SceneManager.GameScene.ZeusFight;
                 float fightGroundTop = GameConstants.BaseScreenSize.Y * 0.7f;
                 player.Position = new Vector2(GameConstants.BaseScreenSize.X - playerSize.X - 40f, 
                     fightGroundTop - playerSize.Y);
@@ -337,7 +299,7 @@ namespace ProjectZeus.Core
             Vector2 playerSize = player.Size;
 
             Vector2 correctedPosition;
-            player.IsOnGround = mountainLevel.CheckPlatformCollision(player.Bounds, player.Velocity, out correctedPosition);
+            player.IsOnGround = sceneManager.MountainLevel.CheckPlatformCollision(player.Bounds, player.Velocity, out correctedPosition);
 
             if (player.IsOnGround)
             {
@@ -350,79 +312,67 @@ namespace ProjectZeus.Core
             player.Position = tempPos2;
 
             bool tryPickupItem = keyboardState.IsKeyDown(Keys.E);
-            mountainLevel.Update(gameTime, player.Position, playerSize, tryPickupItem);
+            sceneManager.MountainLevel.Update(gameTime, player.Position, playerSize, tryPickupItem);
             player.Update(gameTime);
 
-            if (mountainLevel.PlayerDied)
-            {
-                RespawnAfterDeath();
-            }
-
-            if (mountainLevel.ItemWasCollected && !hasCollectedMountainItem)
-            {
-                hasCollectedMountainItem = true;
-                pillarRoom.MountainPortal.IsActive = false;
-                pillarRoom.CurrentCarriedItem = PillarRoom.PillarItemType.Mountain;
-                currentScene = GameScene.PillarRoom;
-                ResetPlayerToPillarRoom();
-            }
+            sceneManager.HandleMountainLevelCompletion(ResetPlayerToPillarRoom, RespawnAfterDeath);
 
             const float leftEdgeThreshold = 10f;
-            if (player.Position.X <= leftEdgeThreshold && hasCollectedMountainItem)
+            if (player.Position.X <= leftEdgeThreshold && sceneManager.HasCollectedMountainItem)
             {
-                currentScene = GameScene.PillarRoom;
+                sceneManager.CurrentScene = SceneManager.GameScene.PillarRoom;
                 ResetPlayerToPillarRoom();
             }
         }
 
         private void RespawnAfterDeath()
         {
-            currentScene = GameScene.PillarRoom;
-            mountainLevel.Reset();
-            hasCollectedMountainItem = false;
-            hasCollectedMazeItem = false;
-            hasCollectedMineItem = false;
-            pillarRoom.ResetItems();
-            pillarRoom.MazePortal.IsActive = true;
-            pillarRoom.MountainPortal.IsActive = true;
-            pillarRoom.MinePortal.IsActive = true;
+            sceneManager.CurrentScene = SceneManager.GameScene.PillarRoom;
+            sceneManager.MountainLevel.Reset();
+            sceneManager.HasCollectedMountainItem = false;
+            sceneManager.HasCollectedMazeItem = false;
+            sceneManager.HasCollectedMineItem = false;
+            sceneManager.PillarRoom.ResetItems();
+            sceneManager.PillarRoom.MazePortal.IsActive = true;
+            sceneManager.PillarRoom.MountainPortal.IsActive = true;
+            sceneManager.PillarRoom.MinePortal.IsActive = true;
             ResetPlayerToPillarRoom();
         }
 
         protected override void Draw(GameTime gameTime)
         {
-            switch (currentScene)
+            switch (sceneManager.CurrentScene)
             {
-                case GameScene.ZeusFight:
-                    zeusFightScene.Draw(spriteBatch, GraphicsDevice, player, gameTime);
+                case SceneManager.GameScene.ZeusFight:
+                    sceneManager.ZeusFightScene.Draw(spriteBatch, GraphicsDevice, player, gameTime);
                     break;
 
-                case GameScene.MazeLevel:
-                    mazeLevel.Draw(spriteBatch, GraphicsDevice, player, gameTime);
+                case SceneManager.GameScene.MazeLevel:
+                    sceneManager.MazeLevel.Draw(spriteBatch, GraphicsDevice, player, gameTime);
                     break;
 
-                case GameScene.MountainLevel:
-                    mountainLevel.Draw(spriteBatch, GraphicsDevice, gameTime);
+                case SceneManager.GameScene.MountainLevel:
+                    sceneManager.MountainLevel.Draw(spriteBatch, GraphicsDevice, gameTime);
                     spriteBatch.Begin();
                     player.Draw(gameTime, spriteBatch);
                     spriteBatch.End();
                     break;
 
-                case GameScene.MineLevel:
+                case SceneManager.GameScene.MineLevel:
                     spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, globalTransformation);
-                    mineLevel.Draw(spriteBatch, GraphicsDevice, gameTime, player,
+                    sceneManager.MineLevel.Draw(spriteBatch, GraphicsDevice, gameTime, player,
                         DrawingHelpers.CreateSolidTexture(GraphicsDevice, 1, 1, Color.White));
                     spriteBatch.End();
                     break;
 
-                case GameScene.PillarRoom:
+                case SceneManager.GameScene.PillarRoom:
                     graphics.GraphicsDevice.Clear(Color.CornflowerBlue);
                     spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, globalTransformation);
                     
-                    bool hasAnyItem = pillarRoom.CurrentCarriedItem != PillarRoom.PillarItemType.None;
-                    pillarRoom.Draw(spriteBatch, gameTime, hasAnyItem);
+                    bool hasAnyItem = sceneManager.PillarRoom.CurrentCarriedItem != PillarItemType.None;
+                    sceneManager.PillarRoom.Draw(spriteBatch, gameTime, hasAnyItem);
                     player.Draw(gameTime, spriteBatch);
-                    pillarRoom.DrawUI(spriteBatch, playerTexture, hasAnyItem);
+                    sceneManager.PillarRoom.DrawUI(spriteBatch, playerTexture, hasAnyItem);
                     
                     spriteBatch.End();
                     break;

@@ -10,7 +10,7 @@
 using System;
 using Microsoft.Xna.Framework;
 
-namespace Platformer2D
+namespace ProjectZeus.Core.Utilities
 {
     /// <summary>
     /// A set of helpful methods for working with rectangles.

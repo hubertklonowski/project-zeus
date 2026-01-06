@@ -64,9 +64,9 @@ namespace ProjectZeus.Core.Levels
             backgroundTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(20, 15, 30));
             
             // Load sprites for bat and cart
-            batSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/bat.aseprite");
-            cartSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/cart.aseprite");
-            stalactiteSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/stalactite.aseprite");
+            batSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Bat);
+            cartSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Cart);
+            stalactiteSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Stalactite);
         }
 
         public void Enter()
@@ -296,31 +296,6 @@ namespace ProjectZeus.Core.Levels
                 Vector2 hasItemSize = font.MeasureString(hasItem);
                 Vector2 hasItemPos = new Vector2((GameConstants.BaseScreenSize.X - hasItemSize.X) / 2f, 40f);
                 spriteBatch.DrawString(font, hasItem, hasItemPos, Color.LightGreen);
-            }
-        }
-    }
-    
-    /// <summary>
-    /// Stalactite hanging from the cave ceiling
-    /// </summary>
-    public class Stalactite
-    {
-        public Vector2 Position { get; set; }
-        public Vector2 Size { get; set; }
-        public AsepriteSprite Sprite { get; set; }
-        
-        public void Draw(SpriteBatch spriteBatch, Texture2D fallbackTexture, GameTime gameTime)
-        {
-            if (Sprite != null && Sprite.IsLoaded)
-            {
-                // Draw using the aseprite sprite
-                Sprite.Draw(spriteBatch, Position, isMoving: false, gameTime, Color.White);
-            }
-            else
-            {
-                // Fallback to simple rectangle
-                Rectangle rect = new Rectangle((int)Position.X, (int)Position.Y, (int)Size.X, (int)Size.Y);
-                spriteBatch.Draw(fallbackTexture, rect, new Color(120, 120, 120));
             }
         }
     }

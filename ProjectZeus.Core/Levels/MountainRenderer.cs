@@ -70,7 +70,7 @@ namespace ProjectZeus.Core.Levels
             {
                 if (rock.Active)
                 {
-                    Rectangle rockRect = new Rectangle((int)rock.Position.X, (int)rock.Position.Y, (int)rock.Size, (int)rock.Size);
+                    Rectangle rockRect = new Rectangle((int)rock.Position.X, (int)rock.Position.Y, (int)rock.Size.X, (int)rock.Size.Y);
                     spriteBatch.Draw(solidTexture, rockRect, rockColor);
                 }
             }
