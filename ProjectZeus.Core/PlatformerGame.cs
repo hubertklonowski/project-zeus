@@ -172,15 +172,12 @@ namespace ProjectZeus.Core
                         if (hasCollectedMazeItem)
                         {
                             pillarRoom.MazePortal.IsActive = false;
+                            pillarRoom.CurrentCarriedItem = PillarRoom.PillarItemType.Maze;
                         }
                         mazeLevel = new MazeLevel();
                         mazeLevel.LoadContent(GraphicsDevice, hudFont);
                         ResetPlayerToPillarRoom();
                     }
-                    break;
-
-                case GameScene.MountainLevel:
-                    UpdateMountainLevel(gameTime);
                     break;
 
                 case GameScene.MineLevel:
@@ -192,6 +189,7 @@ namespace ProjectZeus.Core
                         {
                             hasCollectedMineItem = true;
                             pillarRoom.MinePortal.IsActive = false;
+                            pillarRoom.CurrentCarriedItem = PillarRoom.PillarItemType.Mine;
                         }
                         ResetPlayerToPillarRoom();
                     }
@@ -200,6 +198,10 @@ namespace ProjectZeus.Core
                         player.Position = mineLevel.PlayerPosition;
                         player.Velocity = mineLevel.PlayerVelocity;
                     }
+                    break;
+
+                case GameScene.MountainLevel:
+                    UpdateMountainLevel(gameTime);
                     break;
 
                 case GameScene.PillarRoom:
@@ -265,7 +267,7 @@ namespace ProjectZeus.Core
             bool hasAnyItem = hasCollectedMazeItem || hasCollectedMineItem || hasCollectedMountainItem;
             bool eKeyPressed = keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E);
 
-            if (eKeyPressed && hasAnyItem)
+            if (eKeyPressed && hasAnyItem && pillarRoom.CurrentCarriedItem != PillarRoom.PillarItemType.None)
             {
                 if (pillarRoom.TryInsertItem(player.Position, playerSize))
                 {
@@ -360,6 +362,7 @@ namespace ProjectZeus.Core
             {
                 hasCollectedMountainItem = true;
                 pillarRoom.MountainPortal.IsActive = false;
+                pillarRoom.CurrentCarriedItem = PillarRoom.PillarItemType.Mountain;
                 currentScene = GameScene.PillarRoom;
                 ResetPlayerToPillarRoom();
             }
@@ -416,7 +419,7 @@ namespace ProjectZeus.Core
                     graphics.GraphicsDevice.Clear(Color.CornflowerBlue);
                     spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, globalTransformation);
                     
-                    bool hasAnyItem = hasCollectedMazeItem || hasCollectedMineItem || hasCollectedMountainItem;
+                    bool hasAnyItem = pillarRoom.CurrentCarriedItem != PillarRoom.PillarItemType.None;
                     pillarRoom.Draw(spriteBatch, gameTime, hasAnyItem);
                     player.Draw(gameTime, spriteBatch);
                     pillarRoom.DrawUI(spriteBatch, playerTexture, hasAnyItem);

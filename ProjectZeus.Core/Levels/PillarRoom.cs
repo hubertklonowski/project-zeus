@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework.Input;
 using ProjectZeus.Core.Constants;
 using ProjectZeus.Core.Entities;
 using ProjectZeus.Core.Rendering;
+using MonoGame.Aseprite;
 
 namespace ProjectZeus.Core.Levels
 {
@@ -13,6 +14,14 @@ namespace ProjectZeus.Core.Levels
     /// </summary>
     public class PillarRoom
     {
+        public enum PillarItemType
+        {
+            None,
+            Maze,
+            Mine,
+            Mountain
+        }
+
         private Pillar[] pillars;
         private Portal mazePortal;
         private Portal minePortal;
@@ -23,6 +32,13 @@ namespace ProjectZeus.Core.Levels
         private Texture2D skyTexture;
         private Texture2D portalTexture;
         private SpriteFont font;
+        private AsepriteSprite mazeItemSprite; // grapes for maze item
+
+        // Tracks which item is currently carried in the hub
+        public PillarItemType CurrentCarriedItem { get; set; } = PillarItemType.None;
+
+        // Tracks which specific item is placed in each pillar
+        private PillarItemType[] pillarItems;
 
         public Pillar[] Pillars => pillars;
         public Portal MazePortal => mazePortal;
@@ -51,6 +67,9 @@ namespace ProjectZeus.Core.Levels
                 // Fallback to solid texture if aseprite loading fails
                 portalTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, Color.White);
             }
+
+            // Load maze item sprite (grapes)
+            mazeItemSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/grapes.aseprite");
 
             SetupPillars();
             SetupPortals();
@@ -96,6 +115,12 @@ namespace ProjectZeus.Core.Levels
                     ItemColor = Color.MediumVioletRed
                 }
             };
+
+            pillarItems = new PillarItemType[pillars.Length];
+            for (int i = 0; i < pillarItems.Length; i++)
+            {
+                pillarItems[i] = PillarItemType.None;
+            }
         }
 
         private void SetupPortals()
@@ -122,6 +147,9 @@ namespace ProjectZeus.Core.Levels
 
         public bool TryInsertItem(Vector2 playerPosition, Vector2 playerSize)
         {
+            if (CurrentCarriedItem == PillarItemType.None)
+                return false;
+
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, 
                 (int)playerSize.X, (int)playerSize.Y);
 
@@ -137,6 +165,8 @@ namespace ProjectZeus.Core.Levels
                 if (playerRect.Intersects(interactionRect))
                 {
                     pillars[i].HasItem = true;
+                    pillarItems[i] = CurrentCarriedItem;
+                    CurrentCarriedItem = PillarItemType.None;
                     return true;
                 }
             }
@@ -150,6 +180,16 @@ namespace ProjectZeus.Core.Levels
             {
                 pillar.HasItem = false;
             }
+
+            if (pillarItems != null)
+            {
+                for (int i = 0; i < pillarItems.Length; i++)
+                {
+                    pillarItems[i] = PillarItemType.None;
+                }
+            }
+
+            CurrentCarriedItem = PillarItemType.None;
         }
 
         private bool AreAllItemsInserted()
@@ -203,16 +243,42 @@ namespace ProjectZeus.Core.Levels
                 spriteBatch.Draw(pillarTexture, capitalRect, new Color(240, 240, 240));
 
                 Rectangle slotRect = pillar.GetSlotRectangle();
-                spriteBatch.Draw(slotTexture, slotRect, Color.White);
+
+                // Only draw the empty slot background when there is no item yet.
+                if (!pillar.HasItem)
+                {
+                    spriteBatch.Draw(slotTexture, slotRect, Color.White);
+                }
 
                 if (pillar.HasItem)
                 {
-                    Rectangle itemRect = slotRect;
-                    itemRect.Inflate(-10, -10);
-                    spriteBatch.Draw(pillarTexture, itemRect, pillar.ItemColor);
+                    PillarItemType itemType = pillarItems != null && i < pillarItems.Length
+                        ? pillarItems[i]
+                        : PillarItemType.None;
+
+                    if (itemType == PillarItemType.Maze && mazeItemSprite != null && mazeItemSprite.IsLoaded)
+                    {
+                        // Draw grapes in the slot, centered
+                        Vector2 slotCenter = new Vector2(slotRect.Center.X, slotRect.Center.Y);
+                        Vector2 drawPos = new Vector2(
+                            slotCenter.X - mazeItemSprite.Size.X / 2f,
+                            slotCenter.Y - mazeItemSprite.Size.Y / 2f);
+                        mazeItemSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime, Color.White);
+                    }
+                    else
+                    {
+                        // Mine/mountain (for now colored blocks)
+                        Rectangle itemRect = slotRect;
+                        itemRect.Inflate(-10, -10);
+                        spriteBatch.Draw(pillarTexture, itemRect, pillar.ItemColor);
+                    }
+                }
+                else
+                {
+                    // Empty slot: draw outline to indicate it is a target area.
+                    DrawingHelpers.DrawRectangleOutline(spriteBatch, pillarTexture, slotRect, Color.DarkBlue);
                 }
 
-                DrawingHelpers.DrawRectangleOutline(spriteBatch, pillarTexture, slotRect, Color.DarkBlue);
             }
 
             if (mazePortal.IsActive && !hasItem)
@@ -233,16 +299,30 @@ namespace ProjectZeus.Core.Levels
 
         public void DrawUI(SpriteBatch spriteBatch, Texture2D itemTexture, bool hasAnyItem)
         {
-            if (hasAnyItem)
+            if (hasAnyItem && CurrentCarriedItem != PillarItemType.None)
             {
                 Rectangle inventoryRect = new Rectangle(10, 10, 40, 40);
-                spriteBatch.Draw(itemTexture, inventoryRect, Color.Gold);
-                DrawingHelpers.DrawRectangleOutline(spriteBatch, pillarTexture, inventoryRect, Color.Yellow);
+
+                spriteBatch.Draw(skyTexture, inventoryRect, Color.White);
+
+                if (CurrentCarriedItem == PillarItemType.Maze && mazeItemSprite != null && mazeItemSprite.IsLoaded)
+                {
+                    // Grapes icon for maze item
+                    Vector2 center = new Vector2(inventoryRect.Center.X, inventoryRect.Center.Y);
+                    Vector2 drawPos = new Vector2(
+                        center.X - mazeItemSprite.Size.X / 2f,
+                        center.Y - mazeItemSprite.Size.Y / 2f);
+                    mazeItemSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime: default, Color.White);
+                }
+                else
+                {
+                    // Mine/mountain: colored box for now
+                    spriteBatch.Draw(itemTexture, inventoryRect, Color.Gold);
+                }
 
                 if (font != null)
                 {
                     string inventoryText = "Item collected! Place it in a pillar.";
-                    Vector2 inventoryTextSize = font.MeasureString(inventoryText);
                     Vector2 inventoryTextPos = new Vector2(60f, 20f);
                     spriteBatch.DrawString(font, inventoryText, inventoryTextPos, Color.Gold);
                 }
