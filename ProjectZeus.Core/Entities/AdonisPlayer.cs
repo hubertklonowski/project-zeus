@@ -27,8 +27,13 @@ namespace ProjectZeus.Core.Entities
         public Vector2 Velocity { get; set; }
         public bool IsOnGround { get; set; }
         
+        /// <summary>
+        /// Scale factor for drawing the player. Default is 1.0f.
+        /// </summary>
+        public float Scale { get; set; } = 1.0f;
+        
         // Use actual sprite dimensions instead of hardcoded values
-        public Vector2 Size => new Vector2(spriteWidth, spriteHeight);
+        public Vector2 Size => new Vector2(spriteWidth * Scale, spriteHeight * Scale);
 
         public Rectangle Bounds => new Rectangle(
             (int)Position.X, 
@@ -118,7 +123,7 @@ namespace ProjectZeus.Core.Entities
                 if (Velocity.X < 0)
                     flip = SpriteEffects.FlipHorizontally;
 
-                spriteBatch.Draw(sprite.TextureRegion.Texture, destPos, sourceRect, Color.White, 0f, origin, 1f, flip, 0f);
+                spriteBatch.Draw(sprite.TextureRegion.Texture, destPos, sourceRect, Color.White, 0f, origin, Scale, flip, 0f);
             }
             else
             {
@@ -131,7 +136,7 @@ namespace ProjectZeus.Core.Entities
                 if (Velocity.X < 0)
                     flip = SpriteEffects.FlipHorizontally;
 
-                spriteBatch.Draw(adonisTexture, destPos, sourceRect, Color.White, 0f, origin, 1f, flip, 0f);
+                spriteBatch.Draw(adonisTexture, destPos, sourceRect, Color.White, 0f, origin, Scale, flip, 0f);
             }
         }
     }

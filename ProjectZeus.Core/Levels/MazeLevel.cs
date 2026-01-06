@@ -27,7 +27,8 @@ namespace ProjectZeus.Core
         private bool[,] walls; // true = wall, false = passage
         private Vector2 playerPosition;
         private Vector2 playerVelocity;
-        private readonly Vector2 playerSize = new Vector2(28, 28); // Adjusted to fit maze tiles better
+        private readonly float playerScale = 0.75f; // Scale player to fit maze cells
+        private readonly Vector2 playerCollisionSize = new Vector2(24, 28); // Collision box for scaled player
         private Vector2 itemPosition;
         private bool itemCollected;
         
@@ -277,8 +278,10 @@ namespace ProjectZeus.Core
                 {
                     if (!walls[x, y])
                     {
-                        playerPosition = new Vector2(x * cellSize + cellSize / 2 - playerSize.X / 2,
-                                                     y * cellSize + cellSize / 2 - playerSize.Y / 2);
+                        // Center the collision box within the cell
+                        playerPosition = new Vector2(
+                            x * cellSize + (cellSize - playerCollisionSize.X) / 2,
+                            y * cellSize + (cellSize - playerCollisionSize.Y) / 2);
                         playerVelocity = Vector2.Zero;
                         entrancePosition = new Vector2(x * cellSize + cellSize / 2,
                                                       y * cellSize + cellSize / 2);
@@ -421,7 +424,7 @@ namespace ProjectZeus.Core
             Vector2 newPosition = playerPosition + playerVelocity * dt;
             
             // Collision detection with walls
-            if (!CheckWallCollision(newPosition, playerSize))
+            if (!CheckWallCollision(newPosition, playerCollisionSize))
             {
                 playerPosition = newPosition;
             }
@@ -429,7 +432,7 @@ namespace ProjectZeus.Core
             {
                 // Try moving only on X axis
                 Vector2 xOnly = new Vector2(newPosition.X, playerPosition.Y);
-                if (!CheckWallCollision(xOnly, playerSize))
+                if (!CheckWallCollision(xOnly, playerCollisionSize))
                 {
                     playerPosition = xOnly;
                 }
@@ -437,7 +440,7 @@ namespace ProjectZeus.Core
                 {
                     // Try moving only on Y axis
                     Vector2 yOnly = new Vector2(playerPosition.X, newPosition.Y);
-                    if (!CheckWallCollision(yOnly, playerSize))
+                    if (!CheckWallCollision(yOnly, playerCollisionSize))
                     {
                         playerPosition = yOnly;
                     }
@@ -453,7 +456,7 @@ namespace ProjectZeus.Core
             if (!itemCollected && keyboardState.IsKeyDown(Keys.E))
             {
                 Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y,
-                                                     (int)playerSize.X, (int)playerSize.Y);
+                                                     (int)playerCollisionSize.X, (int)playerCollisionSize.Y);
                 Rectangle itemRect = new Rectangle((int)(itemPosition.X - 12), (int)(itemPosition.Y - 12), 24, 24);
                 
                 if (playerRect.Intersects(itemRect))
@@ -466,7 +469,7 @@ namespace ProjectZeus.Core
             // Check if player wants to exit (reached starting position with item)
             if (itemCollected)
             {
-                float distance = Vector2.Distance(playerPosition + playerSize / 2, entrancePosition);
+                float distance = Vector2.Distance(playerPosition + playerCollisionSize / 2, entrancePosition);
                 
                 if (distance < 30)
                 {
@@ -557,7 +560,7 @@ namespace ProjectZeus.Core
             
             // Check collision with player
             Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y,
-                                                 (int)playerSize.X, (int)playerSize.Y);
+                                                 (int)playerCollisionSize.X, (int)playerCollisionSize.Y);
             Rectangle minotaurRect = new Rectangle((int)minotaurPosition.X, (int)minotaurPosition.Y,
                                                    (int)minotaurSize.X, (int)minotaurSize.Y);
             
@@ -571,7 +574,7 @@ namespace ProjectZeus.Core
                 Vector2 pushedPosition = playerPosition + pushDir * 50f * dt;
                 
                 // Only apply push if it doesn't push player into a wall
-                if (!CheckWallCollision(pushedPosition, playerSize))
+                if (!CheckWallCollision(pushedPosition, playerCollisionSize))
                 {
                     playerPosition = pushedPosition;
                 }
@@ -580,11 +583,18 @@ namespace ProjectZeus.Core
         
         private bool CheckWallCollision(Vector2 position, Vector2 size)
         {
+            // Add a small inset to prevent visual clipping at cell boundaries
+            const float inset = 2f;
+            float adjustedX = position.X + inset;
+            float adjustedY = position.Y + inset;
+            float adjustedWidth = size.X - inset * 2;
+            float adjustedHeight = size.Y - inset * 2;
+            
             // Check four corners of the entity
-            int left = (int)(position.X / cellSize);
-            int right = (int)((position.X + size.X) / cellSize);
-            int top = (int)(position.Y / cellSize);
-            int bottom = (int)((position.Y + size.Y) / cellSize);
+            int left = (int)(adjustedX / cellSize);
+            int right = (int)((adjustedX + adjustedWidth) / cellSize);
+            int top = (int)(adjustedY / cellSize);
+            int bottom = (int)((adjustedY + adjustedHeight) / cellSize);
             
             // Clamp to maze bounds
             left = Math.Max(0, Math.Min(mazeWidth - 1, left));
@@ -606,12 +616,23 @@ namespace ProjectZeus.Core
         {
             graphicsDevice.Clear(new Color(20, 20, 20));
             
+            // Set player scale to fit maze cells
+            player.Scale = playerScale;
+            
+            // Calculate visual offset - the sprite is drawn with origin at bottom-center
+            // so we need to offset the position to align the visual with the collision box
+            Vector2 visualOffset = new Vector2(
+                (player.Size.X - playerCollisionSize.X) / 2,
+                player.Size.Y - playerCollisionSize.Y
+            );
+            
             // Sync player position and velocity to AdonisPlayer for rendering
-            player.Position = playerPosition;
+            // Offset so the visual sprite aligns with the collision box
+            player.Position = playerPosition - visualOffset;
             player.Velocity = playerVelocity;
             
-            // Use actual player sprite size for collision/positioning
-            Vector2 actualPlayerSize = player.Size;
+            // Use collision size for gameplay calculations
+            Vector2 actualPlayerSize = playerCollisionSize;
             
             spriteBatch.Begin();
             
@@ -734,7 +755,7 @@ namespace ProjectZeus.Core
             // Draw carried item indicator if item is collected
             if (itemCollected)
             {
-                Rectangle carriedItemRect = new Rectangle((int)playerPosition.X + (int)playerSize.X / 2 - 10,
+                Rectangle carriedItemRect = new Rectangle((int)playerPosition.X + (int)playerCollisionSize.X / 2 - 10,
                                                          (int)playerPosition.Y - 18, 20, 20);
                 spriteBatch.Draw(solidTexture, carriedItemRect, Color.Gold);
                 DrawRectangleOutline(spriteBatch, carriedItemRect, Color.Orange);
