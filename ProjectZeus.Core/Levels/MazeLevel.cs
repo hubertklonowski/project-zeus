@@ -55,7 +55,7 @@ namespace ProjectZeus.Core
         private SpriteFont font;
         
         // Visibility (slightly smaller radius to force more exploration)
-        private const int visibilityRadius = 13; // cells visible around player
+        private const int visibilityRadius = 3; // cells visible around player
         
         // Configuration constants
         private const float minItemDistanceFromPlayer = 500f; // Item is well hidden but still reachable
@@ -766,10 +766,27 @@ namespace ProjectZeus.Core
             // Draw carried item indicator if item is collected
             if (itemCollected)
             {
-                Rectangle carriedItemRect = new Rectangle((int)playerPosition.X + (int)playerCollisionSize.X / 2 - 10,
-                                                         (int)playerPosition.Y - 18, 20, 20);
-                spriteBatch.Draw(solidTexture, carriedItemRect, Color.Gold);
-                DrawRectangleOutline(spriteBatch, carriedItemRect, Color.Orange);
+                if (grapesSprite != null && grapesSprite.IsLoaded)
+                {
+                    // Draw same grapes sprite above the player's head
+                    Vector2 carriedCenter = new Vector2(
+                        playerPosition.X + playerCollisionSize.X / 2f,
+                        playerPosition.Y - 20f);
+
+                    Vector2 drawPos = new Vector2(
+                        carriedCenter.X - grapesSprite.Size.X / 2f,
+                        carriedCenter.Y - grapesSprite.Size.Y / 2f);
+
+                    grapesSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime, Color.White);
+                }
+                else
+                {
+                    // Fallback to colored rectangle if sprite is not available
+                    Rectangle carriedItemRect = new Rectangle((int)playerPosition.X + (int)playerCollisionSize.X / 2 - 10,
+                                                             (int)playerPosition.Y - 18, 20, 20);
+                    spriteBatch.Draw(solidTexture, carriedItemRect, Color.Gold);
+                    DrawRectangleOutline(spriteBatch, carriedItemRect, Color.Orange);
+                }
             }
             
             // Draw UI
