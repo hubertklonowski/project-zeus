@@ -4,9 +4,9 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Input.Touch;
 
-namespace Platformer2D
+namespace ProjectZeus.Core.Utilities
 {
-    class VirtualGamePad
+    public class VirtualGamePad
     {
         private readonly Vector2 baseScreenSize;
         private Matrix globalTransformation;

@@ -1,13 +1,13 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using ProjectZeus.Core.Constants;
+using Microsoft.Xna.Framework.Input;
 using ProjectZeus.Core.Entities;
 using ProjectZeus.Core.Levels;
 
 namespace ProjectZeus.Core.Game
 {
     /// <summary>
-    /// Manages game scene transitions and state
+    /// Manages game scene transitions and level states
     /// </summary>
     public class SceneManager
     {
@@ -20,18 +20,35 @@ namespace ProjectZeus.Core.Game
             ZeusFight
         }
 
+        private AdonisPlayer player;
+        private PillarRoom pillarRoom;
+        private MineLevel mineLevel;
+        private MazeLevel mazeLevel;
+        private MountainLevel mountainLevel;
+        private ZeusFightScene zeusFightScene;
+
         public GameScene CurrentScene { get; set; } = GameScene.PillarRoom;
+        
         public bool HasCollectedMazeItem { get; set; }
         public bool HasCollectedMineItem { get; set; }
         public bool HasCollectedMountainItem { get; set; }
 
-        public bool HasAnyItem => HasCollectedMazeItem || HasCollectedMineItem || HasCollectedMountainItem;
+        public AdonisPlayer Player => player;
+        public PillarRoom PillarRoom => pillarRoom;
+        public MineLevel MineLevel => mineLevel;
+        public MazeLevel MazeLevel => mazeLevel;
+        public MountainLevel MountainLevel => mountainLevel;
+        public ZeusFightScene ZeusFightScene => zeusFightScene;
 
-        public void ResetItems()
+        public SceneManager(AdonisPlayer player, PillarRoom pillarRoom, MineLevel mineLevel, 
+            MazeLevel mazeLevel, MountainLevel mountainLevel, ZeusFightScene zeusFightScene)
         {
-            HasCollectedMazeItem = false;
-            HasCollectedMineItem = false;
-            HasCollectedMountainItem = false;
+            this.player = player;
+            this.pillarRoom = pillarRoom;
+            this.mineLevel = mineLevel;
+            this.mazeLevel = mazeLevel;
+            this.mountainLevel = mountainLevel;
+            this.zeusFightScene = zeusFightScene;
         }
 
         public void TransitionToScene(GameScene scene)
@@ -39,46 +56,49 @@ namespace ProjectZeus.Core.Game
             CurrentScene = scene;
         }
 
-        public void HandlePillarRoomTransitions(AdonisPlayer player, PillarRoom pillarRoom, 
-            MineLevel mineLevel, MountainLevel mountainLevel, InputManager input)
+        public void HandleMazeLevelCompletion(GraphicsDevice graphicsDevice, SpriteFont hudFont, System.Action resetPlayerAction)
         {
-            // Check maze portal
-            if (pillarRoom.MazePortal.Intersects(player.Bounds) && !HasCollectedMazeItem)
-            {
-                CurrentScene = GameScene.MazeLevel;
-                return;
-            }
+            if (!mazeLevel.IsCompleted) return;
 
-            // Check mine portal
-            if (pillarRoom.MinePortal.Intersects(player.Bounds) && !HasCollectedMineItem)
+            CurrentScene = GameScene.PillarRoom;
+            HasCollectedMazeItem = mazeLevel.HasItem;
+            if (HasCollectedMazeItem)
             {
-                CurrentScene = GameScene.MineLevel;
-                mineLevel.Enter();
-                return;
+                pillarRoom.MazePortal.IsActive = false;
+                pillarRoom.CurrentCarriedItem = PillarItemType.Maze;
             }
+            mazeLevel = new MazeLevel();
+            mazeLevel.LoadContent(graphicsDevice, hudFont);
+            resetPlayerAction?.Invoke();
+        }
 
-            // Check mountain portal (requires E key)
-            if (input.IsKeyJustPressed(Microsoft.Xna.Framework.Input.Keys.E) && 
-                pillarRoom.MountainPortal.Intersects(player.Bounds) && 
-                !HasCollectedMountainItem)
+        public void HandleMineLevelCompletion(System.Action resetPlayerAction)
+        {
+            if (mineLevel.IsActive) return;
+
+            CurrentScene = GameScene.PillarRoom;
+            if (mineLevel.HasCollectedItem)
             {
-                CurrentScene = GameScene.MountainLevel;
-                mountainLevel.Reset();
-                float groundTop = GameConstants.BaseScreenSize.Y - GameConstants.GroundHeight;
-                player.Position = new Vector2(60f, groundTop - player.Size.Y);
-                player.Velocity = Vector2.Zero;
-                player.IsOnGround = true;
-                return;
+                HasCollectedMineItem = true;
+                pillarRoom.MinePortal.IsActive = false;
+                pillarRoom.CurrentCarriedItem = PillarItemType.Mine;
             }
+            resetPlayerAction?.Invoke();
+        }
 
-            // Check if all items inserted - transition to Zeus fight
-            if (pillarRoom.AllItemsInserted)
+        public void HandleMountainLevelCompletion(System.Action resetPlayerAction, System.Action respawnAction)
+        {
+            if (mountainLevel.PlayerDied)
             {
-                CurrentScene = GameScene.ZeusFight;
-                float fightGroundTop = GameConstants.BaseScreenSize.Y * 0.7f;
-                player.Position = new Vector2(GameConstants.BaseScreenSize.X - 100f, fightGroundTop - player.Size.Y);
-                player.Velocity = Vector2.Zero;
-                player.IsOnGround = true;
+                respawnAction?.Invoke();
+            }
+            else if (mountainLevel.ItemWasCollected)
+            {
+                CurrentScene = GameScene.PillarRoom;
+                HasCollectedMountainItem = true;
+                pillarRoom.MountainPortal.IsActive = false;
+                pillarRoom.CurrentCarriedItem = PillarItemType.Mountain;
+                resetPlayerAction?.Invoke();
             }
         }
     }

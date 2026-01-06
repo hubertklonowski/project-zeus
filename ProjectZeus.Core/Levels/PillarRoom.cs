@@ -14,14 +14,6 @@ namespace ProjectZeus.Core.Levels
     /// </summary>
     public class PillarRoom
     {
-        public enum PillarItemType
-        {
-            None,
-            Maze,
-            Mine,
-            Mountain
-        }
-
         private Pillar[] pillars;
         private Portal mazePortal;
         private Portal minePortal;
