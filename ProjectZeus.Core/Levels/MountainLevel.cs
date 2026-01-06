@@ -21,6 +21,7 @@ namespace ProjectZeus.Core
         // Textures
         private Texture2D solidTexture;
         private AsepriteSprite goatSprite;
+        private AsepriteSprite rockSprite;
         private SpriteFont font;
         
         // Random number generator for rock throwing
@@ -77,6 +78,9 @@ namespace ProjectZeus.Core
             
             // Load goat sprite
             goatSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/goat.aseprite");
+            
+            // Load rock sprite for projectiles
+            rockSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/rock.aseprite");
             
             // Build the mountain structure with platforms
             SetupMountain();
@@ -441,6 +445,7 @@ namespace ProjectZeus.Core
             for (int i = rocks.Count - 1; i >= 0; i--)
             {
                 rocks[i].Position += rocks[i].Velocity * dt;
+                rocks[i].Rotation += rocks[i].RotationSpeed * dt;
                 
                 // Remove rocks that go off screen
                 if (rocks[i].Position.Y > baseScreenSize.Y + 50)
@@ -501,12 +506,18 @@ namespace ProjectZeus.Core
             float angle = MathHelper.ToRadians(90f + (float)(random.NextDouble() * ThrowAngleVariation - ThrowAngleOffset));
             float speed = 200f;
             
+            // Use rock sprite size if available, otherwise fallback to 20x20
+            Vector2 rockSize = (rockSprite != null && rockSprite.IsLoaded) 
+                ? rockSprite.Size 
+                : new Vector2(20, 20);
+            
             rocks.Add(new Rock
             {
-                Position = new Vector2(goatPosition.X + goatSize.X / 2f - 10f, goatPosition.Y + goatSize.Y),
-                Size = new Vector2(20, 20),
+                Position = new Vector2(goatPosition.X + goatSize.X / 2f - rockSize.X / 2f, goatPosition.Y + goatSize.Y),
+                Size = rockSize,
                 Velocity = new Vector2((float)System.Math.Cos(angle) * speed, (float)System.Math.Sin(angle) * speed),
-                Color = new Color(80, 70, 60)
+                Rotation = 0f,
+                RotationSpeed = (float)(random.NextDouble() * 10f - 5f) // Random rotation speed
             });
         }
         
@@ -609,15 +620,30 @@ namespace ProjectZeus.Core
                 spriteBatch.Draw(solidTexture, horn2, new Color(220, 220, 200));
             }
             
-            // Draw rocks
+            // Draw rocks using rock sprite
             foreach (var rock in rocks)
             {
-                Rectangle rockRect = new Rectangle(
-                    (int)rock.Position.X,
-                    (int)rock.Position.Y,
-                    (int)rock.Size.X,
-                    (int)rock.Size.Y);
-                spriteBatch.Draw(solidTexture, rockRect, rock.Color);
+                if (rockSprite != null && rockSprite.IsLoaded)
+                {
+                    // Draw rock sprite with rotation
+                    var texture = rockSprite.GetFrameTexture(0);
+                    if (texture != null)
+                    {
+                        Vector2 origin = new Vector2(rockSprite.Size.X / 2f, rockSprite.Size.Y / 2f);
+                        Vector2 drawPos = rock.Position + origin;
+                        spriteBatch.Draw(texture, drawPos, null, Color.White, rock.Rotation, origin, 1f, SpriteEffects.None, 0f);
+                    }
+                }
+                else
+                {
+                    // Fallback to simple rectangle
+                    Rectangle rockRect = new Rectangle(
+                        (int)rock.Position.X,
+                        (int)rock.Position.Y,
+                        (int)rock.Size.X,
+                        (int)rock.Size.Y);
+                    spriteBatch.Draw(solidTexture, rockRect, new Color(80, 70, 60));
+                }
             }
             
             // Draw item if not collected
@@ -706,7 +732,8 @@ namespace ProjectZeus.Core
             public Vector2 Position { get; set; }
             public Vector2 Size { get; set; }
             public Vector2 Velocity { get; set; }
-            public Color Color { get; set; }
+            public float Rotation { get; set; }
+            public float RotationSpeed { get; set; }
         }
     }
 }

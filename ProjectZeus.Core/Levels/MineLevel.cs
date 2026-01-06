@@ -23,7 +23,7 @@ namespace ProjectZeus.Core.Levels
         private List<Rectangle> rails;
         private List<MineCart> carts;
         private List<MineBat> bats;
-        private List<Rectangle> stalactites;
+        private List<Stalactite> stalactites;
         private List<Rectangle> torches;
         
         private Rectangle exitRect;
@@ -36,6 +36,7 @@ namespace ProjectZeus.Core.Levels
         
         private AsepriteSprite batSprite;
         private AsepriteSprite cartSprite;
+        private AsepriteSprite stalactiteSprite;
         
         private Random random;
 
@@ -50,7 +51,7 @@ namespace ProjectZeus.Core.Levels
             rails = new List<Rectangle>();
             carts = new List<MineCart>();
             bats = new List<MineBat>();
-            stalactites = new List<Rectangle>();
+            stalactites = new List<Stalactite>();
             torches = new List<Rectangle>();
             random = new Random();
             IsActive = false;
@@ -65,6 +66,7 @@ namespace ProjectZeus.Core.Levels
             // Load sprites for bat and cart
             batSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/bat.aseprite");
             cartSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/cart.aseprite");
+            stalactiteSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/stalactite.aseprite");
         }
 
         public void Enter()
@@ -134,7 +136,12 @@ namespace ProjectZeus.Core.Levels
             for (int x = 100; x < 700; x += 80)
             {
                 int height = 30 + random.Next(30);
-                stalactites.Add(new Rectangle(x, 0, 20, height));
+                stalactites.Add(new Stalactite
+                {
+                    Position = new Vector2(x, 0),
+                    Size = new Vector2(20, height),
+                    Sprite = stalactiteSprite
+                });
             }
 
             torches.Add(new Rectangle(30, (int)(GameConstants.BaseScreenSize.Y - 50), 15, 25));
@@ -232,9 +239,9 @@ namespace ProjectZeus.Core.Levels
             Rectangle bgRect = new Rectangle(0, 0, (int)GameConstants.BaseScreenSize.X, (int)GameConstants.BaseScreenSize.Y);
             spriteBatch.Draw(backgroundTexture, bgRect, Color.White);
 
-            foreach (Rectangle stalactite in stalactites)
+            foreach (Stalactite stalactite in stalactites)
             {
-                spriteBatch.Draw(platformTexture, stalactite, new Color(120, 120, 120));
+                stalactite.Draw(spriteBatch, platformTexture, gameTime);
             }
 
             foreach (Rectangle platform in platforms)
@@ -289,6 +296,31 @@ namespace ProjectZeus.Core.Levels
                 Vector2 hasItemSize = font.MeasureString(hasItem);
                 Vector2 hasItemPos = new Vector2((GameConstants.BaseScreenSize.X - hasItemSize.X) / 2f, 40f);
                 spriteBatch.DrawString(font, hasItem, hasItemPos, Color.LightGreen);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Stalactite hanging from the cave ceiling
+    /// </summary>
+    public class Stalactite
+    {
+        public Vector2 Position { get; set; }
+        public Vector2 Size { get; set; }
+        public AsepriteSprite Sprite { get; set; }
+        
+        public void Draw(SpriteBatch spriteBatch, Texture2D fallbackTexture, GameTime gameTime)
+        {
+            if (Sprite != null && Sprite.IsLoaded)
+            {
+                // Draw using the aseprite sprite
+                Sprite.Draw(spriteBatch, Position, isMoving: false, gameTime, Color.White);
+            }
+            else
+            {
+                // Fallback to simple rectangle
+                Rectangle rect = new Rectangle((int)Position.X, (int)Position.Y, (int)Size.X, (int)Size.Y);
+                spriteBatch.Draw(fallbackTexture, rect, new Color(120, 120, 120));
             }
         }
     }

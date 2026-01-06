@@ -31,7 +31,13 @@
     <None Update="Content\Sprites\minotaur.aseprite">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Content\Sprites\rock.aseprite">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Content\Sprites\sandtile.aseprite">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Content\Sprites\stalactite.aseprite">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="Content\Sprites\vase.aseprite">
