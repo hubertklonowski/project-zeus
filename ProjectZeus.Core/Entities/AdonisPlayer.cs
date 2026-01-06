@@ -118,7 +118,7 @@ namespace ProjectZeus.Core.Entities
 
                 spriteBatch.Draw(sprite.TextureRegion.Texture, destRect, sourceRect, Color.White, 0f, Vector2.Zero, flip, 0f);
             }
-            else
+            else if (adonisTexture != null)
             {
                 // Fallback - use same integer-based rendering
                 var sourceRect = new Rectangle(0, 0, spriteWidth, spriteHeight);
