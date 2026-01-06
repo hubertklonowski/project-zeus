@@ -116,27 +116,37 @@ namespace ProjectZeus.Core.Entities
                 // Create sprite for the current frame
                 var sprite = adonisFile.CreateSprite(spriteBatch.GraphicsDevice, frameIndex, onlyVisibleLayers: true, includeBackgroundLayer: false, includeTilemapLayers: false);
                 var sourceRect = sprite.TextureRegion.Bounds;
-                var origin = new Vector2(sourceRect.Width / 2f, sourceRect.Height);
-                var destPos = Position + new Vector2(Size.X / 2f, Size.Y);
+                
+                // Round position to avoid sub-pixel jittering
+                // Create destination rectangle with integer positions to avoid pixel artifacts
+                Rectangle destRect = new Rectangle(
+                    (int)Math.Floor(Position.X),
+                    (int)Math.Floor(Position.Y),
+                    (int)Math.Ceiling(Size.X),
+                    (int)Math.Ceiling(Size.Y));
 
                 flip = SpriteEffects.None;
                 if (Velocity.X < 0)
                     flip = SpriteEffects.FlipHorizontally;
 
-                spriteBatch.Draw(sprite.TextureRegion.Texture, destPos, sourceRect, Color.White, 0f, origin, Scale, flip, 0f);
+                spriteBatch.Draw(sprite.TextureRegion.Texture, destRect, sourceRect, Color.White, 0f, Vector2.Zero, flip, 0f);
             }
             else
             {
-                // Fallback
+                // Fallback - use same integer-based rendering
                 var sourceRect = new Rectangle(0, 0, spriteWidth, spriteHeight);
-                var origin = new Vector2(spriteWidth / 2f, spriteHeight);
-                var destPos = Position + new Vector2(Size.X / 2f, Size.Y);
+                
+                Rectangle destRect = new Rectangle(
+                    (int)Math.Floor(Position.X),
+                    (int)Math.Floor(Position.Y),
+                    (int)Math.Ceiling(Size.X),
+                    (int)Math.Ceiling(Size.Y));
 
                 flip = SpriteEffects.None;
                 if (Velocity.X < 0)
                     flip = SpriteEffects.FlipHorizontally;
 
-                spriteBatch.Draw(adonisTexture, destPos, sourceRect, Color.White, 0f, origin, Scale, flip, 0f);
+                spriteBatch.Draw(adonisTexture, destRect, sourceRect, Color.White, 0f, Vector2.Zero, flip, 0f);
             }
         }
     }

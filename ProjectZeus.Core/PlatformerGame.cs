@@ -141,7 +141,8 @@ namespace ProjectZeus.Core
             float spacing = 200f;
             float groundTop = GameConstants.BaseScreenSize.Y - GameConstants.GroundHeight;
             
-            player.Position = new Vector2(centerX - spacing - 80f, groundTop - GameConstants.PlayerSize.Y);
+            // Use player.Size for consistent positioning
+            player.Position = new Vector2(centerX - spacing - 80f, groundTop - player.Size.Y);
             player.Velocity = Vector2.Zero;
             player.IsOnGround = true;
         }
@@ -234,9 +235,12 @@ namespace ProjectZeus.Core
 
             player.IsOnGround = false;
 
-            if (player.Position.Y + GameConstants.PlayerSize.Y >= groundTop)
+            // Use player.Size for consistent collision with visual size
+            Vector2 playerSize = player.Size;
+            
+            if (player.Position.Y + playerSize.Y >= groundTop)
             {
-                player.Position = new Vector2(player.Position.X, groundTop - GameConstants.PlayerSize.Y);
+                player.Position = new Vector2(player.Position.X, groundTop - playerSize.Y);
                 player.Velocity = new Vector2(player.Velocity.X, 0f);
                 player.IsOnGround = true;
             }
@@ -254,7 +258,7 @@ namespace ProjectZeus.Core
             }
 
             Vector2 tempPos = player.Position;
-            Physics.PlatformerPhysics.ClampToScreen(ref tempPos, GameConstants.PlayerSize);
+            Physics.PlatformerPhysics.ClampToScreen(ref tempPos, playerSize);
             player.Position = tempPos;
             player.Update(gameTime);
 
@@ -263,7 +267,7 @@ namespace ProjectZeus.Core
 
             if (eKeyPressed && hasAnyItem)
             {
-                if (pillarRoom.TryInsertItem(player.Position, GameConstants.PlayerSize))
+                if (pillarRoom.TryInsertItem(player.Position, playerSize))
                 {
                     hasCollectedMazeItem = false;
                     hasCollectedMineItem = false;
@@ -288,7 +292,7 @@ namespace ProjectZeus.Core
             {
                 currentScene = GameScene.MountainLevel;
                 mountainLevel.Reset();
-                player.Position = new Vector2(60f, groundTop - GameConstants.PlayerSize.Y);
+                player.Position = new Vector2(60f, groundTop - playerSize.Y);
                 player.Velocity = Vector2.Zero;
                 player.IsOnGround = true;
                 return;
@@ -298,8 +302,8 @@ namespace ProjectZeus.Core
             {
                 currentScene = GameScene.ZeusFight;
                 float fightGroundTop = GameConstants.BaseScreenSize.Y * 0.7f;
-                player.Position = new Vector2(GameConstants.BaseScreenSize.X - GameConstants.PlayerSize.X - 40f, 
-                    fightGroundTop - GameConstants.PlayerSize.Y);
+                player.Position = new Vector2(GameConstants.BaseScreenSize.X - playerSize.X - 40f, 
+                    fightGroundTop - playerSize.Y);
                 player.Velocity = Vector2.Zero;
                 player.IsOnGround = true;
             }
@@ -327,6 +331,9 @@ namespace ProjectZeus.Core
             player.Velocity = new Vector2(player.Velocity.X, player.Velocity.Y + GameConstants.Gravity * dt);
             player.Position += player.Velocity * dt;
 
+            // Use player.Size for consistent collision
+            Vector2 playerSize = player.Size;
+
             Vector2 correctedPosition;
             player.IsOnGround = mountainLevel.CheckPlatformCollision(player.Bounds, player.Velocity, out correctedPosition);
 
@@ -337,11 +344,11 @@ namespace ProjectZeus.Core
             }
 
             Vector2 tempPos2 = player.Position;
-            Physics.PlatformerPhysics.ClampToScreen(ref tempPos2, GameConstants.PlayerSize);
+            Physics.PlatformerPhysics.ClampToScreen(ref tempPos2, playerSize);
             player.Position = tempPos2;
 
             bool tryPickupItem = keyboardState.IsKeyDown(Keys.E);
-            mountainLevel.Update(gameTime, player.Position, GameConstants.PlayerSize, tryPickupItem);
+            mountainLevel.Update(gameTime, player.Position, playerSize, tryPickupItem);
             player.Update(gameTime);
 
             if (mountainLevel.PlayerDied)
