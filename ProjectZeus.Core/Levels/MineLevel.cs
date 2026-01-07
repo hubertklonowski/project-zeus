@@ -25,6 +25,10 @@ namespace ProjectZeus.Core.Levels
         // Cart speed (moving toward player)
         private const float CartSpeed = 120f;
         
+        // Cart spawning for return trip
+        private const float CartSpawnInterval = 2.5f; // Seconds between cart spawns during return
+        private float cartSpawnTimer;
+        
         // Player state
         private Vector2 playerPosition;
         private Vector2 playerVelocity;
@@ -103,6 +107,7 @@ namespace ProjectZeus.Core.Levels
             itemCollected = false;
             HasCollectedItem = false;
             PlayerDied = false;
+            cartSpawnTimer = CartSpawnInterval;
             
             // Player starts on the left side of the level
             float groundTop = ScreenHeight - GroundHeight;
@@ -293,6 +298,17 @@ namespace ProjectZeus.Core.Levels
                     carts.RemoveAt(i);
                 }
             }
+            
+            // Spawn carts from the right side when player is returning (after collecting item)
+            if (itemCollected)
+            {
+                cartSpawnTimer -= deltaTime;
+                if (cartSpawnTimer <= 0)
+                {
+                    SpawnReturnCart();
+                    cartSpawnTimer = CartSpawnInterval;
+                }
+            }
 
             // Update bats (they move around)
             foreach (var bat in bats)
@@ -446,6 +462,27 @@ namespace ProjectZeus.Core.Levels
             // Smooth camera follow
             cameraOffset.X = MathHelper.Lerp(cameraOffset.X, targetCameraX, 0.1f);
             cameraOffset.Y = 0; // No vertical scrolling
+        }
+        
+        private void SpawnReturnCart()
+        {
+            float groundTop = ScreenHeight - GroundHeight;
+            
+            // Spawn cart just off the right side of the visible screen
+            float spawnX = cameraOffset.X + ScreenWidth + 50f;
+            
+            // Only spawn if not too far into the level (player is returning)
+            if (spawnX < WorldWidth)
+            {
+                carts.Add(new MineCart
+                {
+                    Position = new Vector2(spawnX, groundTop - 20),
+                    Velocity = new Vector2(-CartSpeed, 0), // Moving left toward player
+                    MinX = 0,
+                    MaxX = WorldWidth,
+                    Sprite = cartSprite
+                });
+            }
         }
 
         public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, GameTime gameTime, 

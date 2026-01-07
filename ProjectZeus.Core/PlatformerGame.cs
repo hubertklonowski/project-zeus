@@ -146,7 +146,16 @@ namespace ProjectZeus.Core
 
                 case SceneManager.GameScene.MazeLevel:
                     sceneManager.MazeLevel.Update(gameTime, keyboardState);
-                    sceneManager.HandleMazeLevelCompletion(GraphicsDevice, hudFont, ResetPlayerToPillarRoom);
+                    
+                    // Handle player caught by minotaur - use unified death handler
+                    if (sceneManager.MazeLevel.PlayerCaughtByMinotaur)
+                    {
+                        RespawnAfterDeath();
+                    }
+                    else
+                    {
+                        sceneManager.HandleMazeLevelCompletion(GraphicsDevice, hudFont, ResetPlayerToPillarRoom);
+                    }
                     break;
 
                 case SceneManager.GameScene.MineLevel:
@@ -359,6 +368,11 @@ namespace ProjectZeus.Core
             // Reset all levels
             sceneManager.MountainLevel.Reset();
             sceneManager.MineLevel.Reset();
+            
+            // Recreate maze level (it doesn't have a Reset method, needs fresh instance)
+            var newMazeLevel = new MazeLevel();
+            newMazeLevel.LoadContent(GraphicsDevice, hudFont);
+            sceneManager.ReplaceMazeLevel(newMazeLevel);
             
             // Clear all collected items
             sceneManager.HasCollectedMountainItem = false;

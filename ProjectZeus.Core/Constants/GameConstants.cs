@@ -15,7 +15,7 @@ namespace ProjectZeus.Core.Constants
         public const float Gravity = 900f;
         
         // Mountain level physics constants
-        public const float MountainJumpReduction = 0.75f; // 25% reduction for increased difficulty
+        public const float MountainJumpReduction = 0.95f; // 10% reduction - still challenging but completable
         
         // Ground constants
         public const float GroundHeight = 20f;

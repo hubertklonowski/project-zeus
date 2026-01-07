@@ -102,5 +102,10 @@ namespace ProjectZeus.Core.Game
                 resetPlayerAction?.Invoke();
             }
         }
+
+        public void ReplaceMazeLevel(MazeLevel newMazeLevel)
+        {
+            mazeLevel = newMazeLevel;
+        }
     }
 }

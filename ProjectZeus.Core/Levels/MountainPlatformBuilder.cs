@@ -14,11 +14,13 @@ namespace ProjectZeus.Core.Levels
         // Platform generation constants
         private const float GroundHeight = 20f;
         private const float PlatformHeight = 15f;
-        private const float LevelSpacing = 70f; // Vertical spacing between platform levels
-        private const int PlatformsPerLevel = 5;
-        private const float MinPlatformWidth = 70f;
-        private const float MaxPlatformWidth = 85f;
+        private const float LevelSpacing = 70f; // Reduced spacing for achievable jumps
+        private const float MinPlatformWidth = 65f;
+        private const float MaxPlatformWidth = 80f;
         private const float ScreenWidth = 800f;
+        
+        // Moving platform constants
+        private const float MovingPlatformSpeed = 50f; // Pixels per second
         
         // Color progression as player climbs (gets lighter toward top)
         private static readonly Color[] LevelColors =
@@ -32,35 +34,47 @@ namespace ProjectZeus.Core.Levels
             new Color(150, 130, 110)  // Summit
         ];
         
-        public static List<Platform> BuildPlatforms(Vector2 screenSize)
+        public static (List<Platform> staticPlatforms, List<MovingPlatform> movingPlatforms) BuildPlatforms(Vector2 screenSize)
         {
-            var platforms = new List<Platform>();
+            var staticPlatforms = new List<Platform>();
+            var movingPlatforms = new List<MovingPlatform>();
             float baseY = WorldHeight - GroundHeight;
             
             // Ground at bottom of the extended world
-            platforms.Add(new Platform
+            staticPlatforms.Add(new Platform
             {
                 Position = new Vector2(0, baseY),
                 Size = new Vector2(screenSize.X, GroundHeight),
                 Color = new Color(100, 80, 60)
             });
             
-            // Generate platform levels procedurally
-            int totalLevels = 30;
-            float currentY = baseY - 50f; // Start first level above ground
+            // Generate platform levels with zigzag pattern
+            int totalLevels = 28;
+            float currentY = baseY - 55f; // Start first level above ground
             
             for (int level = 0; level < totalLevels; level++)
             {
                 // Determine color based on screen section
-                int colorIndex = level / 6; // Change color every 6 levels
+                int colorIndex = level / 5;
                 if (colorIndex >= LevelColors.Length)
                     colorIndex = LevelColors.Length - 1;
                 Color levelColor = LevelColors[colorIndex];
                 
-                // Generate platforms for this level
-                int platformCount = GetPlatformCount(level, totalLevels);
-                var levelPlatforms = GenerateLevelPlatforms(level, currentY, platformCount, levelColor);
-                platforms.AddRange(levelPlatforms);
+                // Every 5th level (starting at level 4) is a moving platform level
+                bool isMovingPlatformLevel = (level % 5) == 4 && level > 3;
+                
+                if (isMovingPlatformLevel)
+                {
+                    // Create a moving platform
+                    var movingPlatform = GenerateMovingPlatform(level, currentY, levelColor);
+                    movingPlatforms.Add(movingPlatform);
+                }
+                else
+                {
+                    // Generate static platforms - zigzag pattern with stepping stones
+                    var levelPlatforms = GenerateLevelPlatforms(level, currentY, levelColor);
+                    staticPlatforms.AddRange(levelPlatforms);
+                }
                 
                 // Move up to next level with slight variation
                 float spacing = LevelSpacing + GetHeightVariation(level);
@@ -68,27 +82,51 @@ namespace ProjectZeus.Core.Levels
             }
             
             // Add the final goat platform at the top
-            platforms.Add(new Platform
+            staticPlatforms.Add(new Platform
             {
                 Position = new Vector2(screenSize.X / 2f - 150f, baseY - 2120),
                 Size = new Vector2(300, PlatformHeight),
-                Color = LevelColors[^1] // Last color
+                Color = LevelColors[^1]
             });
             
-            return platforms;
+            return (staticPlatforms, movingPlatforms);
         }
         
         /// <summary>
-        /// Gets the number of platforms for a given level (fewer near top for challenge)
+        /// Generates a moving platform for the specified level
         /// </summary>
-        private static int GetPlatformCount(int level, int totalLevels)
+        private static MovingPlatform GenerateMovingPlatform(int level, float y, Color color)
         {
-            // Reduced platform count across all levels for increased difficulty
-            if (level >= totalLevels - 2)
-                return 2;
-            if (level >= totalLevels - 4)
-                return 3;
-            return 3; // Reduced from PlatformsPerLevel (5) for harder gameplay
+            float platformWidth = 90f; // Wide for easier landing
+            
+            // Moving platforms travel a shorter distance (middle portion of screen)
+            bool startsOnLeft = (level % 2) == 0;
+            
+            Vector2 startPos;
+            Vector2 endPos;
+            
+            if (startsOnLeft)
+            {
+                startPos = new Vector2(150f, y);
+                endPos = new Vector2(ScreenWidth - platformWidth - 150f, y);
+            }
+            else
+            {
+                startPos = new Vector2(ScreenWidth - platformWidth - 150f, y);
+                endPos = new Vector2(150f, y);
+            }
+            
+            return new MovingPlatform
+            {
+                Position = startPos,
+                StartPosition = startPos,
+                EndPosition = endPos,
+                Size = new Vector2(platformWidth, PlatformHeight),
+                Color = new Color(180, 160, 140),
+                Speed = MovingPlatformSpeed,
+                Progress = 0f,
+                MovingToEnd = true
+            };
         }
         
         /// <summary>
@@ -96,49 +134,84 @@ namespace ProjectZeus.Core.Levels
         /// </summary>
         private static float GetHeightVariation(int level)
         {
-            // Use a simple pattern for variation instead of random (for consistency)
-            return (level % 3) switch
+            return (level % 4) switch
             {
                 0 => 0f,
                 1 => 5f,
-                2 => -5f,
+                2 => -3f,
+                3 => 8f,
                 _ => 0f
             };
         }
         
         /// <summary>
-        /// Generates platforms for a single level with horizontal distribution
+        /// Generates platforms for a single level with zigzag pattern
         /// </summary>
-        private static List<Platform> GenerateLevelPlatforms(int level, float y, int count, Color color)
+        private static List<Platform> GenerateLevelPlatforms(int level, float y, Color color)
         {
             var platforms = new List<Platform>();
             
-            // Calculate horizontal spacing based on platform count
-            float usableWidth = ScreenWidth - 60f; // Leave margins on sides
-            float sectionWidth = usableWidth / count;
+            // Create a zigzag pattern: left-center-right-center-left...
+            // This requires diagonal jumps but not impossible ones
+            int pattern = level % 4;
+            float mainPlatformWidth = GetPlatformWidth(level);
+            float mainPlatformX;
             
-            for (int i = 0; i < count; i++)
+            switch (pattern)
             {
-                // Calculate base X position with offset pattern
-                float baseX = 30f + (i * sectionWidth);
+                case 0: // Left side
+                    mainPlatformX = 80f + GetHorizontalVariation(level);
+                    break;
+                case 1: // Center-left
+                    mainPlatformX = 250f + GetHorizontalVariation(level);
+                    break;
+                case 2: // Center-right
+                    mainPlatformX = 450f + GetHorizontalVariation(level);
+                    break;
+                case 3: // Right side
+                default:
+                    mainPlatformX = ScreenWidth - mainPlatformWidth - 80f - GetHorizontalVariation(level);
+                    break;
+            }
+            
+            // Clamp to screen bounds
+            mainPlatformX = MathHelper.Clamp(mainPlatformX, 40f, ScreenWidth - mainPlatformWidth - 40f);
+            
+            // Add slight Y variation
+            float yOffset = GetVerticalOffset(level);
+            
+            // Add main platform
+            platforms.Add(new Platform
+            {
+                Position = new Vector2(mainPlatformX, y + yOffset),
+                Size = new Vector2(mainPlatformWidth, PlatformHeight),
+                Color = color
+            });
+            
+            // Add a helper stepping stone on alternating levels to assist with longer jumps
+            if (level % 2 == 1)
+            {
+                float stepWidth = 50f;
+                float stepX;
                 
-                // Add horizontal offset based on level and platform index for variety
-                float offsetPattern = GetHorizontalOffset(level, i);
-                float x = baseX + offsetPattern;
+                // Position stepping stone between current and next expected platform position
+                if (pattern == 0 || pattern == 1)
+                {
+                    // Going right, place step to the right of main
+                    stepX = mainPlatformX + mainPlatformWidth + 80f;
+                }
+                else
+                {
+                    // Going left, place step to the left of main
+                    stepX = mainPlatformX - stepWidth - 80f;
+                }
                 
-                // Clamp to screen bounds
-                x = MathHelper.Clamp(x, 30f, ScreenWidth - MaxPlatformWidth - 30f);
-                
-                // Vary platform width
-                float width = GetPlatformWidth(level, i);
-                
-                // Add slight Y variation for visual interest
-                float yOffset = GetVerticalOffset(level, i);
+                stepX = MathHelper.Clamp(stepX, 50f, ScreenWidth - stepWidth - 50f);
                 
                 platforms.Add(new Platform
                 {
-                    Position = new Vector2(x, y + yOffset),
-                    Size = new Vector2(width, PlatformHeight),
+                    Position = new Vector2(stepX, y + 10f),
+                    Size = new Vector2(stepWidth, PlatformHeight),
                     Color = color
                 });
             }
@@ -147,36 +220,34 @@ namespace ProjectZeus.Core.Levels
         }
         
         /// <summary>
-        /// Gets horizontal offset for platform variety using deterministic pattern
+        /// Gets horizontal variation to prevent perfectly aligned platforms
         /// </summary>
-        private static float GetHorizontalOffset(int level, int platformIndex)
+        private static float GetHorizontalVariation(int level)
         {
-            // Create a wave-like pattern that varies by level
-            int pattern = (level + platformIndex) % 5;
+            int pattern = level % 5;
             return pattern switch
             {
                 0 => 0f,
                 1 => 20f,
-                2 => -10f,
-                3 => 15f,
-                4 => -15f,
+                2 => -15f,
+                3 => 25f,
+                4 => -10f,
                 _ => 0f
             };
         }
         
         /// <summary>
-        /// Gets vertical offset for slight height variation within a level
+        /// Gets vertical offset for slight height variation
         /// </summary>
-        private static float GetVerticalOffset(int level, int platformIndex)
+        private static float GetVerticalOffset(int level)
         {
-            // Alternate slight vertical offsets
-            int pattern = (level * 3 + platformIndex) % 4;
+            int pattern = level % 4;
             return pattern switch
             {
                 0 => 0f,
                 1 => -5f,
-                2 => 5f,
-                3 => -10f,
+                2 => 3f,
+                3 => -8f,
                 _ => 0f
             };
         }
@@ -184,17 +255,15 @@ namespace ProjectZeus.Core.Levels
         /// <summary>
         /// Gets platform width with variation
         /// </summary>
-        private static float GetPlatformWidth(int level, int platformIndex)
+        private static float GetPlatformWidth(int level)
         {
-            // Vary width based on position
-            int pattern = (level + platformIndex * 2) % 4;
+            int pattern = level % 3;
             return pattern switch
             {
-                0 => 70f,
+                0 => 65f,
                 1 => 75f,
                 2 => 80f,
-                3 => 85f,
-                _ => 75f
+                _ => 70f
             };
         }
         
@@ -203,7 +272,7 @@ namespace ProjectZeus.Core.Levels
         /// </summary>
         public static float GetTopPlatformY()
         {
-            return WorldHeight - GroundHeight - 2120; // baseY - 2120
+            return WorldHeight - GroundHeight - 2120;
         }
     }
 }
