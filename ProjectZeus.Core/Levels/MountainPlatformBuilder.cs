@@ -85,10 +85,10 @@ namespace ProjectZeus.Core.Levels
         {
             // Reduced platform count across all levels for increased difficulty
             if (level >= totalLevels - 2)
-                return 2; // Was 3
+                return 2;
             if (level >= totalLevels - 4)
-                return 3; // Was 4
-            return 3; // Was 5 - reduced everywhere
+                return 3;
+            return 3; // Reduced from PlatformsPerLevel (5) for harder gameplay
         }
         
         /// <summary>

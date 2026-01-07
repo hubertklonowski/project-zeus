@@ -14,6 +14,9 @@ namespace ProjectZeus.Core.Constants
         public const float JumpVelocity = -560f;
         public const float Gravity = 900f;
         
+        // Mountain level physics constants
+        public const float MountainJumpReduction = 0.75f; // 25% reduction for increased difficulty
+        
         // Ground constants
         public const float GroundHeight = 20f;
         

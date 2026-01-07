@@ -295,7 +295,7 @@ namespace ProjectZeus.Core
             if (player.IsOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up)))
             {
                 // Reduced jump height for mountain level to increase difficulty
-                float mountainJumpVelocity = GameConstants.JumpVelocity * 0.75f; // 25% reduction
+                float mountainJumpVelocity = GameConstants.JumpVelocity * GameConstants.MountainJumpReduction;
                 player.Velocity = new Vector2(player.Velocity.X, mountainJumpVelocity);
                 player.IsOnGround = false;
             }
