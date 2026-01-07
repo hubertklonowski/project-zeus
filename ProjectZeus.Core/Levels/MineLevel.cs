@@ -47,6 +47,9 @@ namespace ProjectZeus.Core.Levels
         private Rectangle itemRect;
         private bool itemCollected;
         
+        // Exit portal at start of level
+        private Portal exitPortal;
+        
         // Textures and fonts
         private Texture2D solidTexture;
         private SpriteFont font;
@@ -118,6 +121,13 @@ namespace ProjectZeus.Core.Levels
             
             // Place item at end of level
             itemRect = new Rectangle((int)(WorldWidth - 150), (int)(groundTop - 50), 30, 30);
+            
+            // Create exit portal at the start of the level
+            exitPortal = new Portal(
+                new Vector2(50f, groundTop - 80f),
+                new Vector2(60f, 80f),
+                new Color(100, 200, 255));
+            exitPortal.IsActive = false; // Only active after collecting item
         }
 
         private void GenerateObstacles()
@@ -412,11 +422,13 @@ namespace ProjectZeus.Core.Levels
                 {
                     itemCollected = true;
                     HasCollectedItem = true;
+                    // Activate exit portal once item is collected
+                    exitPortal.IsActive = true;
                 }
             }
             
-            // Auto-exit when player reaches the end of the level
-            if (playerPosition.X >= WorldWidth - 50)
+            // Exit through portal at start after collecting item
+            if (itemCollected && exitPortal.Intersects(playerRect))
             {
                 IsActive = false;
             }
@@ -512,6 +524,14 @@ namespace ProjectZeus.Core.Levels
                 Rectangle glowRect = itemRect;
                 glowRect.Inflate(5, 5);
                 spriteBatch.Draw(solidTexture, glowRect, new Color(255, 215, 0, 100));
+            }
+            
+            // Draw exit portal if active (after collecting item)
+            if (exitPortal != null && exitPortal.IsActive && 
+                exitPortal.Position.X >= cameraOffset.X - 100 && 
+                exitPortal.Position.X <= cameraOffset.X + ScreenWidth + 100)
+            {
+                DrawingHelpers.DrawPortal(spriteBatch, portalTexture, exitPortal.Bounds, gameTime, exitPortal.BaseColor);
             }
             
             // Draw player
@@ -614,7 +634,7 @@ namespace ProjectZeus.Core.Levels
 
             if (itemCollected)
             {
-                string hasItem = "Item collected! Reach the exit!";
+                string hasItem = "Item collected! Return to the start and exit through the portal!";
                 Vector2 hasItemSize = font.MeasureString(hasItem);
                 Vector2 hasItemPos = new Vector2((ScreenWidth - hasItemSize.X) / 2f, 70f);
                 spriteBatch.DrawString(font, hasItem, hasItemPos, Color.LightGreen);
@@ -635,6 +655,7 @@ namespace ProjectZeus.Core.Levels
             bats.Clear();
             guanos.Clear();
             gigaBat = null;
+            exitPortal = null;
             cameraOffset = Vector2.Zero;
         }
     }
