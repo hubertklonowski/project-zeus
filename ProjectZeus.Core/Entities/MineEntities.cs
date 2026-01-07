@@ -269,7 +269,5 @@ namespace ProjectZeus.Core.Entities
                 spriteBatch.Draw(fallbackTexture, rightWing, new Color(40, 20, 50));
             }
         }
-            }
-        }
     }
 }
