@@ -14,6 +14,48 @@ namespace ProjectZeus.Core.Levels
     }
 
     /// <summary>
+    /// Moving platform that oscillates between two points
+    /// </summary>
+    public class MovingPlatform : Platform
+    {
+        public Vector2 StartPosition { get; set; }
+        public Vector2 EndPosition { get; set; }
+        public float Speed { get; set; }
+        public float Progress { get; set; } // 0 to 1, position between start and end
+        public bool MovingToEnd { get; set; } = true;
+        
+        /// <summary>
+        /// Updates the platform position based on elapsed time
+        /// </summary>
+        public void Update(float deltaTime)
+        {
+            float distance = Vector2.Distance(StartPosition, EndPosition);
+            float progressDelta = (Speed * deltaTime) / distance;
+            
+            if (MovingToEnd)
+            {
+                Progress += progressDelta;
+                if (Progress >= 1f)
+                {
+                    Progress = 1f;
+                    MovingToEnd = false;
+                }
+            }
+            else
+            {
+                Progress -= progressDelta;
+                if (Progress <= 0f)
+                {
+                    Progress = 0f;
+                    MovingToEnd = true;
+                }
+            }
+            
+            Position = Vector2.Lerp(StartPosition, EndPosition, Progress);
+        }
+    }
+
+    /// <summary>
     /// Rock projectile thrown by the goat
     /// </summary>
     public class Rock

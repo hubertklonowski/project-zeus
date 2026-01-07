@@ -55,7 +55,8 @@ namespace ProjectZeus.Core
         
         public bool IsCompleted { get; private set; }
         public bool HasItem { get; private set; }
-        
+        public bool PlayerCaughtByMinotaur { get; private set; }
+
         private Random random;
         
         public MazeLevel()
@@ -259,7 +260,13 @@ namespace ProjectZeus.Core
             
             // Update minotaur
             minotaurController.Update(dt, playerPosition, walls, cellSize, mazeWidth, mazeHeight);
-            playerPosition = minotaurController.HandlePlayerCollision(playerPosition, playerCollisionSize, dt, walls, cellSize, mazeWidth, mazeHeight);
+            
+            // Check if player is caught by minotaur
+            if (minotaurController.IsActive && CheckMinotaurCollision())
+            {
+                PlayerCaughtByMinotaur = true;
+                return;
+            }
             
             // Check item pickup with E key
             if (!itemCollected && keyboardState.IsKeyDown(Keys.E))
@@ -317,6 +324,20 @@ namespace ProjectZeus.Core
             }
             
             return false;
+        }
+        
+        private bool CheckMinotaurCollision()
+        {
+            // Check collision with minotaur
+            Vector2 minotaurPosition = minotaurController.Position;
+            Vector2 minotaurCollisionSize = minotaurController.CollisionSize;
+            
+            Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y,
+                                                 (int)playerCollisionSize.X, (int)playerCollisionSize.Y);
+            Rectangle minotaurRect = new Rectangle((int)minotaurPosition.X, (int)minotaurPosition.Y,
+                                                   (int)minotaurCollisionSize.X, (int)minotaurCollisionSize.Y);
+            
+            return playerRect.Intersects(minotaurRect);
         }
         
         public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, AdonisPlayer player, GameTime gameTime)

@@ -323,7 +323,7 @@ namespace ProjectZeus.Core.Levels
 
             string instructions = hasAnyItem
                 ? "Press E near an empty pillar to place the item"
-                : "Walk into a portal to enter a level";
+                : "Press E near a portal to enter a level";
             Vector2 instructionsSize = font.MeasureString(instructions);
             Vector2 instructionsPos = new Vector2((GameConstants.BaseScreenSize.X - instructionsSize.X) / 2f, 70f);
             spriteBatch.DrawString(font, instructions, instructionsPos, Color.White);

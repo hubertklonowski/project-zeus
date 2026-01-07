@@ -46,14 +46,15 @@ namespace ProjectZeus.Core
         
         // Mountain platforms
         private List<Platform> platforms;
+        private List<MovingPlatform> movingPlatforms;
         
         // Goat enemy
         private Vector2 goatPosition;
         private readonly Vector2 goatSize = new Vector2(40, 40);
         private float goatThrowTimer;
-        private const float GoatThrowInterval = 2.5f;
+        private const float GoatThrowInterval = 1f; // Increased frequency - was 2.5f
         private Vector2 goatVelocity;
-        private const float GoatMoveSpeed = 60f;
+        private const float GoatMoveSpeed = 70f;
         private Rectangle topPlatformBounds;
         
         // Rocks (projectiles)
@@ -80,6 +81,7 @@ namespace ProjectZeus.Core
         public MountainLevel()
         {
             platforms = new List<Platform>();
+            movingPlatforms = new List<MovingPlatform>();
             rocks = new List<Rock>();
             itemCollected = false;
             PlayerDied = false;
@@ -110,8 +112,10 @@ namespace ProjectZeus.Core
             // Get world height from the platform builder
             worldHeight = MountainPlatformBuilder.WorldHeight;
             
-            // Build platforms
-            platforms = MountainPlatformBuilder.BuildPlatforms(baseScreenSize);
+            // Build platforms (both static and moving)
+            var (staticPlatforms, movingPlats) = MountainPlatformBuilder.BuildPlatforms(baseScreenSize);
+            platforms = staticPlatforms;
+            movingPlatforms = movingPlats;
             
             // The top platform is at the very top of the extended world
             float topPlatformY = MountainPlatformBuilder.GetTopPlatformY();
@@ -169,6 +173,12 @@ namespace ProjectZeus.Core
             
             // Update camera to follow player
             UpdateCamera(playerPosition);
+            
+            // Update moving platforms
+            foreach (var movingPlatform in movingPlatforms)
+            {
+                movingPlatform.Update(dt);
+            }
             
             // Update goat movement (patrol back and forth on top platform)
             goatPosition += goatVelocity * dt;
@@ -278,6 +288,7 @@ namespace ProjectZeus.Core
             correctedPosition = new Vector2(playerRect.X, playerRect.Y);
             bool onPlatform = false;
             
+            // Check static platforms
             foreach (var platform in platforms)
             {
                 Rectangle platformRect = new Rectangle(
@@ -285,6 +296,29 @@ namespace ProjectZeus.Core
                     (int)platform.Position.Y,
                     (int)platform.Size.X,
                     (int)platform.Size.Y);
+                
+                // Top collision (landing on platform)
+                Rectangle topRect = new Rectangle(platformRect.X, platformRect.Y - CollisionTopOffset, platformRect.Width, CollisionHeight);
+                
+                if (playerRect.Bottom > topRect.Top &&
+                    playerRect.Bottom <= topRect.Top + CollisionVerticalThreshold &&
+                    playerRect.Right > topRect.Left &&
+                    playerRect.Left < topRect.Right &&
+                    playerVelocity.Y >= 0)
+                {
+                    correctedPosition.Y = topRect.Top - playerRect.Height;
+                    onPlatform = true;
+                }
+            }
+            
+            // Check moving platforms
+            foreach (var movingPlatform in movingPlatforms)
+            {
+                Rectangle platformRect = new Rectangle(
+                    (int)movingPlatform.Position.X,
+                    (int)movingPlatform.Position.Y,
+                    (int)movingPlatform.Size.X,
+                    (int)movingPlatform.Size.Y);
                 
                 // Top collision (landing on platform)
                 Rectangle topRect = new Rectangle(platformRect.X, platformRect.Y - CollisionTopOffset, platformRect.Width, CollisionHeight);
@@ -335,6 +369,27 @@ namespace ProjectZeus.Core
                 
                 // Draw platform outline
                 DrawRectangleOutline(spriteBatch, platformRect, new Color(80, 60, 40));
+            }
+            
+            // Draw moving platforms with distinct appearance
+            foreach (var movingPlatform in movingPlatforms)
+            {
+                Rectangle platformRect = new Rectangle(
+                    (int)movingPlatform.Position.X,
+                    (int)movingPlatform.Position.Y,
+                    (int)movingPlatform.Size.X,
+                    (int)movingPlatform.Size.Y);
+                spriteBatch.Draw(solidTexture, platformRect, movingPlatform.Color);
+                
+                // Draw platform outline with different color to indicate it moves
+                DrawRectangleOutline(spriteBatch, platformRect, new Color(100, 80, 60));
+                
+                // Draw arrows to indicate movement direction
+                int arrowY = platformRect.Y + platformRect.Height / 2 - 3;
+                Rectangle leftArrow = new Rectangle(platformRect.X + 5, arrowY, 8, 6);
+                Rectangle rightArrow = new Rectangle(platformRect.Right - 13, arrowY, 8, 6);
+                spriteBatch.Draw(solidTexture, leftArrow, new Color(60, 50, 40));
+                spriteBatch.Draw(solidTexture, rightArrow, new Color(60, 50, 40));
             }
             
             // Draw goat using aseprite sprite
@@ -487,6 +542,14 @@ namespace ProjectZeus.Core
             {
                 goatPosition = new Vector2(topPlatformBounds.X + 50f, topPlatformBounds.Y - goatSize.Y);
                 goatVelocity = new Vector2(GoatMoveSpeed, 0f);
+            }
+            
+            // Reset moving platforms to starting positions
+            foreach (var movingPlatform in movingPlatforms)
+            {
+                movingPlatform.Position = movingPlatform.StartPosition;
+                movingPlatform.Progress = 0f;
+                movingPlatform.MovingToEnd = true;
             }
             
             // Reset camera to show bottom of level

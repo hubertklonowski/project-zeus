@@ -25,6 +25,10 @@ namespace ProjectZeus.Core.Levels
         // Cart speed (moving toward player)
         private const float CartSpeed = 120f;
         
+        // Cart spawning for return trip
+        private const float CartSpawnInterval = 2.5f; // Seconds between cart spawns during return
+        private float cartSpawnTimer;
+        
         // Player state
         private Vector2 playerPosition;
         private Vector2 playerVelocity;
@@ -40,10 +44,15 @@ namespace ProjectZeus.Core.Levels
         private List<MineCart> carts;
         private List<Stalactite> stalactites;
         private List<MineBat> bats;
+        private GigaBat gigaBat;
+        private List<Guano> guanos;
         
         // Item at end of level
         private Rectangle itemRect;
         private bool itemCollected;
+        
+        // Exit portal at start of level
+        private Portal exitPortal;
         
         // Textures and fonts
         private Texture2D solidTexture;
@@ -76,6 +85,7 @@ namespace ProjectZeus.Core.Levels
             carts = new List<MineCart>();
             stalactites = new List<Stalactite>();
             bats = new List<MineBat>();
+            guanos = new List<Guano>();
             random = new Random();
             IsActive = false;
         }
@@ -97,6 +107,7 @@ namespace ProjectZeus.Core.Levels
             itemCollected = false;
             HasCollectedItem = false;
             PlayerDied = false;
+            cartSpawnTimer = CartSpawnInterval;
             
             // Player starts on the left side of the level
             float groundTop = ScreenHeight - GroundHeight;
@@ -115,6 +126,13 @@ namespace ProjectZeus.Core.Levels
             
             // Place item at end of level
             itemRect = new Rectangle((int)(WorldWidth - 150), (int)(groundTop - 50), 30, 30);
+            
+            // Create exit portal at the start of the level
+            exitPortal = new Portal(
+                new Vector2(50f, groundTop - 80f),
+                new Vector2(60f, 80f),
+                new Color(100, 200, 255));
+            exitPortal.IsActive = false; // Only active after collecting item
         }
 
         private void GenerateObstacles()
@@ -203,6 +221,19 @@ namespace ProjectZeus.Core.Levels
                 float spacing = minBatSpacing + (float)random.NextDouble() * (maxBatSpacing - minBatSpacing);
                 nextBatX += spacing;
             }
+            
+            // Create one GigaBat positioned in middle of level at ceiling
+            gigaBat = new GigaBat
+            {
+                Position = new Vector2(WorldWidth / 2, 150f),
+                Velocity = new Vector2(40f, 0f),
+                ChangeDirectionTimer = 3f,
+                ShootTimer = 2f,
+                Sprite = batSprite
+            };
+            
+            // Clear any existing guano
+            guanos.Clear();
         }
 
         public void Update(GameTime gameTime, KeyboardState keyboardState, KeyboardState previousKeyboardState)
@@ -254,16 +285,28 @@ namespace ProjectZeus.Core.Levels
             UpdateCamera();
             
             // Update carts - they move toward the player on tracks
-            foreach (var cart in carts)
+            for (int i = carts.Count - 1; i >= 0; i--)
             {
+                var cart = carts[i];
+                
                 // Move cart toward player (left direction)
                 cart.Position += new Vector2(cart.Velocity.X * deltaTime, 0);
                 
                 // Remove carts that go off the left side of the world
-                // (they're handled below in collision, but stop at world edge)
-                if (cart.Position.X < -50)
+                if (cart.Position.X < -100)
                 {
-                    cart.Position = new Vector2(-50, cart.Position.Y);
+                    carts.RemoveAt(i);
+                }
+            }
+            
+            // Spawn carts from the right side when player is returning (after collecting item)
+            if (itemCollected)
+            {
+                cartSpawnTimer -= deltaTime;
+                if (cartSpawnTimer <= 0)
+                {
+                    SpawnReturnCart();
+                    cartSpawnTimer = CartSpawnInterval;
                 }
             }
 
@@ -340,6 +383,51 @@ namespace ProjectZeus.Core.Levels
                     return;
                 }
             }
+            
+            // Update GigaBat
+            if (gigaBat != null)
+            {
+                gigaBat.Update(deltaTime, random, 100f, WorldWidth - 100f, 100f, 250f);
+                
+                // Check if GigaBat should shoot
+                if (gigaBat.ShouldShoot())
+                {
+                    // Shoot guano downward
+                    guanos.Add(new Guano
+                    {
+                        Position = gigaBat.Position,
+                        Velocity = new Vector2(0, 200f) // Falls downward
+                    });
+                }
+                
+                // Check collision with GigaBat
+                if (playerRect.Intersects(gigaBat.Bounds))
+                {
+                    PlayerDied = true;
+                    return;
+                }
+            }
+            
+            // Update guano projectiles
+            for (int i = guanos.Count - 1; i >= 0; i--)
+            {
+                var guano = guanos[i];
+                guano.Position += guano.Velocity * deltaTime;
+                
+                // Remove guano that goes off screen
+                if (guano.Position.Y > ScreenHeight)
+                {
+                    guanos.RemoveAt(i);
+                    continue;
+                }
+                
+                // Check collision with player
+                if (playerRect.Intersects(guano.Bounds))
+                {
+                    PlayerDied = true;
+                    return;
+                }
+            }
 
             // Check if player reached the item
             if (!itemCollected && keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E))
@@ -350,17 +438,15 @@ namespace ProjectZeus.Core.Levels
                 {
                     itemCollected = true;
                     HasCollectedItem = true;
+                    // Activate exit portal once item is collected
+                    exitPortal.IsActive = true;
                 }
             }
             
-            // Check if player reached end of level and wants to exit
-            if (playerPosition.X >= WorldWidth - 100 && playerPosition.X <= WorldWidth - 20)
+            // Exit through portal at start after collecting item
+            if (itemCollected && exitPortal.Intersects(playerRect))
             {
-                // Player is at the exit area
-                if (keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E))
-                {
-                    IsActive = false;
-                }
+                IsActive = false;
             }
         }
         
@@ -376,6 +462,27 @@ namespace ProjectZeus.Core.Levels
             // Smooth camera follow
             cameraOffset.X = MathHelper.Lerp(cameraOffset.X, targetCameraX, 0.1f);
             cameraOffset.Y = 0; // No vertical scrolling
+        }
+        
+        private void SpawnReturnCart()
+        {
+            float groundTop = ScreenHeight - GroundHeight;
+            
+            // Spawn cart just off the right side of the visible screen
+            float spawnX = cameraOffset.X + ScreenWidth + 50f;
+            
+            // Only spawn if not too far into the level (player is returning)
+            if (spawnX < WorldWidth)
+            {
+                carts.Add(new MineCart
+                {
+                    Position = new Vector2(spawnX, groundTop - 20),
+                    Velocity = new Vector2(-CartSpeed, 0), // Moving left toward player
+                    MinX = 0,
+                    MaxX = WorldWidth,
+                    Sprite = cartSprite
+                });
+            }
         }
 
         public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, GameTime gameTime, 
@@ -429,6 +536,23 @@ namespace ProjectZeus.Core.Levels
                 }
             }
             
+            // Draw GigaBat
+            if (gigaBat != null && gigaBat.Position.X >= cameraOffset.X - 100 && 
+                gigaBat.Position.X <= cameraOffset.X + ScreenWidth + 100)
+            {
+                gigaBat.Draw(spriteBatch, solidTexture, gameTime);
+            }
+            
+            // Draw guano projectiles
+            foreach (var guano in guanos)
+            {
+                if (guano.Position.X >= cameraOffset.X - 50 && 
+                    guano.Position.X <= cameraOffset.X + ScreenWidth + 50)
+                {
+                    guano.Draw(spriteBatch, solidTexture);
+                }
+            }
+            
             // Draw item if not collected
             if (!itemCollected && itemRect.X >= cameraOffset.X - 50 && 
                 itemRect.X <= cameraOffset.X + ScreenWidth + 50)
@@ -437,6 +561,14 @@ namespace ProjectZeus.Core.Levels
                 Rectangle glowRect = itemRect;
                 glowRect.Inflate(5, 5);
                 spriteBatch.Draw(solidTexture, glowRect, new Color(255, 215, 0, 100));
+            }
+            
+            // Draw exit portal if active (after collecting item)
+            if (exitPortal != null && exitPortal.IsActive && 
+                exitPortal.Position.X >= cameraOffset.X - 100 && 
+                exitPortal.Position.X <= cameraOffset.X + ScreenWidth + 100)
+            {
+                DrawingHelpers.DrawPortal(spriteBatch, portalTexture, exitPortal.Bounds, gameTime, exitPortal.BaseColor);
             }
             
             // Draw player
@@ -527,7 +659,7 @@ namespace ProjectZeus.Core.Levels
             if (!IsActive) return;
             
             // Draw instructions
-            string instructions = "Arrow keys to move, SPACE to jump! Avoid carts, stalactites, and bats!";
+            string instructions = "Arrow keys to move, SPACE to jump! Avoid carts, stalactites, bats, and GigaBat!";
             Vector2 instructionsSize = font.MeasureString(instructions);
             Vector2 instructionsPos = new Vector2((ScreenWidth - instructionsSize.X) / 2f, 10f);
             spriteBatch.DrawString(font, instructions, instructionsPos, Color.White);
@@ -539,7 +671,7 @@ namespace ProjectZeus.Core.Levels
 
             if (itemCollected)
             {
-                string hasItem = "Item collected! Reach the exit (press E)!";
+                string hasItem = "Item collected! Return to the start and exit through the portal!";
                 Vector2 hasItemSize = font.MeasureString(hasItem);
                 Vector2 hasItemPos = new Vector2((ScreenWidth - hasItemSize.X) / 2f, 70f);
                 spriteBatch.DrawString(font, hasItem, hasItemPos, Color.LightGreen);
@@ -558,6 +690,9 @@ namespace ProjectZeus.Core.Levels
             carts.Clear();
             stalactites.Clear();
             bats.Clear();
+            guanos.Clear();
+            gigaBat = null;
+            exitPortal = null;
             cameraOffset = Vector2.Zero;
         }
     }

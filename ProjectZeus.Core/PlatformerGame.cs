@@ -146,7 +146,16 @@ namespace ProjectZeus.Core
 
                 case SceneManager.GameScene.MazeLevel:
                     sceneManager.MazeLevel.Update(gameTime, keyboardState);
-                    sceneManager.HandleMazeLevelCompletion(GraphicsDevice, hudFont, ResetPlayerToPillarRoom);
+                    
+                    // Handle player caught by minotaur - use unified death handler
+                    if (sceneManager.MazeLevel.PlayerCaughtByMinotaur)
+                    {
+                        RespawnAfterDeath();
+                    }
+                    else
+                    {
+                        sceneManager.HandleMazeLevelCompletion(GraphicsDevice, hudFont, ResetPlayerToPillarRoom);
+                    }
                     break;
 
                 case SceneManager.GameScene.MineLevel:
@@ -245,13 +254,13 @@ namespace ProjectZeus.Core
                 }
             }
 
-            if (sceneManager.PillarRoom.MazePortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMazeItem)
+            if (eKeyPressed && sceneManager.PillarRoom.MazePortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMazeItem)
             {
                 sceneManager.CurrentScene = SceneManager.GameScene.MazeLevel;
                 return;
             }
 
-            if (sceneManager.PillarRoom.MinePortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMineItem)
+            if (eKeyPressed && sceneManager.PillarRoom.MinePortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMineItem)
             {
                 sceneManager.CurrentScene = SceneManager.GameScene.MineLevel;
                 sceneManager.MineLevel.Enter();
@@ -294,7 +303,9 @@ namespace ProjectZeus.Core
 
             if (player.IsOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up)))
             {
-                player.Velocity = new Vector2(player.Velocity.X, GameConstants.JumpVelocity);
+                // Reduced jump height for mountain level to increase difficulty
+                float mountainJumpVelocity = GameConstants.JumpVelocity * GameConstants.MountainJumpReduction;
+                player.Velocity = new Vector2(player.Velocity.X, mountainJumpVelocity);
                 player.IsOnGround = false;
             }
 
@@ -357,6 +368,11 @@ namespace ProjectZeus.Core
             // Reset all levels
             sceneManager.MountainLevel.Reset();
             sceneManager.MineLevel.Reset();
+            
+            // Recreate maze level (it doesn't have a Reset method, needs fresh instance)
+            var newMazeLevel = new MazeLevel();
+            newMazeLevel.LoadContent(GraphicsDevice, hudFont);
+            sceneManager.ReplaceMazeLevel(newMazeLevel);
             
             // Clear all collected items
             sceneManager.HasCollectedMountainItem = false;
