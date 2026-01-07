@@ -83,6 +83,7 @@ namespace ProjectZeus.Core.Game
                 pillarRoom.MinePortal.IsActive = false;
                 pillarRoom.CurrentCarriedItem = PillarItemType.Mine;
             }
+            mineLevel.Reset();
             resetPlayerAction?.Invoke();
         }
 

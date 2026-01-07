@@ -11,48 +11,71 @@ using ProjectZeus.Core.Rendering;
 namespace ProjectZeus.Core.Levels
 {
     /// <summary>
-    /// Mine level with platforms, carts, bats, and collectible item
+    /// Side-scrolling mine level where player moves right through the mine.
+    /// Camera follows the player as they move. Carts drive on tracks toward the player.
     /// </summary>
     public class MineLevel
     {
+        // World dimensions - level spans multiple screens horizontally
+        private const float WorldWidth = 4000f; // 5 screens wide
+        private const float GroundHeight = 20f;
+        private const float ScreenWidth = 800f;
+        private const float ScreenHeight = 480f;
+        
+        // Cart speed (moving toward player)
+        private const float CartSpeed = 120f;
+        
+        // Player state
         private Vector2 playerPosition;
         private Vector2 playerVelocity;
         private bool playerOnGround;
         
-        private List<Rectangle> platforms;
-        private List<Rectangle> rails;
-        private List<MineCart> carts;
-        private List<MineBat> bats;
-        private List<Stalactite> stalactites;
-        private List<Rectangle> torches;
+        // Camera
+        private Vector2 cameraOffset;
         
-        private Rectangle exitRect;
+        // Ground
+        private Rectangle groundRect;
+        
+        // Obstacles
+        private List<MineCart> carts;
+        private List<Stalactite> stalactites;
+        private List<MineBat> bats;
+        
+        // Item at end of level
         private Rectangle itemRect;
         private bool itemCollected;
         
-        private Texture2D platformTexture;
-        private Texture2D backgroundTexture;
+        // Textures and fonts
+        private Texture2D solidTexture;
         private SpriteFont font;
         
-        private AsepriteSprite batSprite;
+        // Sprites
         private AsepriteSprite cartSprite;
         private AsepriteSprite stalactiteSprite;
+        private AsepriteSprite batSprite;
         
+        // Random for procedural generation
         private Random random;
 
         public bool IsActive { get; private set; }
         public bool HasCollectedItem { get; private set; }
+        public bool PlayerDied { get; private set; }
         public Vector2 PlayerPosition => playerPosition;
         public Vector2 PlayerVelocity => playerVelocity;
+        
+        /// <summary>
+        /// Gets the camera transformation matrix for rendering
+        /// </summary>
+        public Matrix GetCameraTransform()
+        {
+            return Matrix.CreateTranslation(-cameraOffset.X, -cameraOffset.Y, 0);
+        }
 
         public MineLevel()
         {
-            platforms = new List<Rectangle>();
-            rails = new List<Rectangle>();
             carts = new List<MineCart>();
-            bats = new List<MineBat>();
             stalactites = new List<Stalactite>();
-            torches = new List<Rectangle>();
+            bats = new List<MineBat>();
             random = new Random();
             IsActive = false;
         }
@@ -60,13 +83,12 @@ namespace ProjectZeus.Core.Levels
         public void LoadContent(GraphicsDevice graphicsDevice, SpriteFont font)
         {
             this.font = font;
-            platformTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(100, 100, 100));
-            backgroundTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(20, 15, 30));
+            solidTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, Color.White);
             
-            // Load sprites for bat and cart
-            batSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Bat);
+            // Load sprites
             cartSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Cart);
             stalactiteSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Stalactite);
+            batSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Bat);
         }
 
         public void Enter()
@@ -74,159 +96,286 @@ namespace ProjectZeus.Core.Levels
             IsActive = true;
             itemCollected = false;
             HasCollectedItem = false;
+            PlayerDied = false;
             
-            playerPosition = new Vector2(50f, GameConstants.BaseScreenSize.Y - GameConstants.PlayerSize.Y - 30f);
+            // Player starts on the left side of the level
+            float groundTop = ScreenHeight - GroundHeight;
+            playerPosition = new Vector2(100f, groundTop - GameConstants.PlayerSize.Y);
             playerVelocity = Vector2.Zero;
-            playerOnGround = false;
-
-            SetupMineStructure();
+            playerOnGround = true;
+            
+            // Initialize camera at start
+            cameraOffset = Vector2.Zero;
+            
+            // Setup ground
+            groundRect = new Rectangle(0, (int)(ScreenHeight - GroundHeight), (int)WorldWidth, (int)GroundHeight);
+            
+            // Generate obstacles procedurally
+            GenerateObstacles();
+            
+            // Place item at end of level
+            itemRect = new Rectangle((int)(WorldWidth - 150), (int)(groundTop - 50), 30, 30);
         }
 
-        private void SetupMineStructure()
+        private void GenerateObstacles()
         {
-            platforms.Clear();
-            rails.Clear();
             carts.Clear();
-            bats.Clear();
             stalactites.Clear();
-            torches.Clear();
-
-            platforms.Add(new Rectangle(0, (int)(GameConstants.BaseScreenSize.Y - GameConstants.GroundHeight), 
-                (int)GameConstants.BaseScreenSize.X, (int)GameConstants.GroundHeight));
-            platforms.Add(new Rectangle(50, (int)(GameConstants.BaseScreenSize.Y - 120), 180, 15));
-            platforms.Add(new Rectangle(250, (int)(GameConstants.BaseScreenSize.Y - 180), 120, 15));
-            platforms.Add(new Rectangle(400, (int)(GameConstants.BaseScreenSize.Y - 240), 150, 15));
-            platforms.Add(new Rectangle(180, (int)(GameConstants.BaseScreenSize.Y - 280), 100, 15));
-            platforms.Add(new Rectangle(320, (int)(GameConstants.BaseScreenSize.Y - 340), 160, 15));
-            platforms.Add(new Rectangle(550, (int)(GameConstants.BaseScreenSize.Y - 200), 180, 15));
-            platforms.Add(new Rectangle(600, (int)(GameConstants.BaseScreenSize.Y - 100), 150, 15));
-
-            rails.Add(new Rectangle(50, (int)(GameConstants.BaseScreenSize.Y - 125), 180, 5));
-            rails.Add(new Rectangle(550, (int)(GameConstants.BaseScreenSize.Y - 205), 180, 5));
-
-            carts.Add(new MineCart
+            bats.Clear();
+            
+            float groundTop = ScreenHeight - GroundHeight;
+            
+            // Generate carts on the tracks - they will move toward the player
+            float minCartSpacing = 300f;
+            float maxCartSpacing = 500f;
+            
+            float nextCartX = 500f; // First cart position (ahead of player start)
+            
+            while (nextCartX < WorldWidth - 200)
             {
-                Position = new Vector2(100, GameConstants.BaseScreenSize.Y - 140),
-                Velocity = new Vector2(40, 0),
-                MinX = 60,
-                MaxX = 220,
-                Sprite = cartSprite
-            });
-
-            carts.Add(new MineCart
-            {
-                Position = new Vector2(600, GameConstants.BaseScreenSize.Y - 220),
-                Velocity = new Vector2(-50, 0),
-                MinX = 560,
-                MaxX = 720,
-                Sprite = cartSprite
-            });
-
-            for (int i = 0; i < 4; i++)
-            {
-                bats.Add(new MineBat
+                // Carts sit on the rails and will move toward player
+                carts.Add(new MineCart
                 {
-                    Position = new Vector2(200 + i * 150, 150 + i * 40),
-                    Velocity = new Vector2((float)(random.NextDouble() * 2 - 1) * 60f, (float)(random.NextDouble() * 2 - 1) * 60f),
-                    ChangeDirectionTimer = (float)random.NextDouble() * 2f,
-                    Sprite = batSprite
+                    Position = new Vector2(nextCartX, groundTop - 20), // Cart on rails
+                    Velocity = new Vector2(-CartSpeed, 0), // Moving left toward player
+                    MinX = 0, // Can go all the way left
+                    MaxX = WorldWidth, // Track bounds
+                    Sprite = cartSprite
                 });
+                
+                // Random spacing for next cart
+                float spacing = minCartSpacing + (float)random.NextDouble() * (maxCartSpacing - minCartSpacing);
+                nextCartX += spacing;
             }
-
-            for (int x = 100; x < 700; x += 80)
+            
+            // Generate stalactites hanging from ceiling
+            // Position them so player can hit their head on them when jumping
+            // Player jump reaches approximately Y = groundTop - playerHeight - jumpHeight
+            // With JumpVelocity of -560 and gravity 900, max jump height is about 175 pixels
+            // So stalactites should extend down to around Y = 285-350 to be dangerous
+            float minStalactiteSpacing = 180f;
+            float maxStalactiteSpacing = 350f;
+            
+            float nextStalactiteX = 350f;
+            
+            while (nextStalactiteX < WorldWidth - 100)
             {
-                int height = 30 + random.Next(30);
+                // Stalactites hang from ceiling (Y=30 is below the ceiling graphic)
+                // Make them long enough to reach into jump range
+                int height = 80 + random.Next(100); // 80-180 pixels tall, reaching down to Y=110-210
+                
                 stalactites.Add(new Stalactite
                 {
-                    Position = new Vector2(x, 0),
+                    Position = new Vector2(nextStalactiteX, 30), // Start below ceiling
                     Size = new Vector2(20, height),
                     Sprite = stalactiteSprite
                 });
+                
+                // Random spacing for next stalactite
+                float spacing = minStalactiteSpacing + (float)random.NextDouble() * (maxStalactiteSpacing - minStalactiteSpacing);
+                nextStalactiteX += spacing;
             }
-
-            torches.Add(new Rectangle(30, (int)(GameConstants.BaseScreenSize.Y - 50), 15, 25));
-            torches.Add(new Rectangle(230, (int)(GameConstants.BaseScreenSize.Y - 210), 15, 25));
-            torches.Add(new Rectangle(580, (int)(GameConstants.BaseScreenSize.Y - 230), 15, 25));
-            torches.Add(new Rectangle(730, (int)(GameConstants.BaseScreenSize.Y - 130), 15, 25));
-
-            itemRect = new Rectangle(350, (int)(GameConstants.BaseScreenSize.Y - 280), 30, 30);
-            exitRect = new Rectangle(670, (int)(GameConstants.BaseScreenSize.Y - 150), 50, 50);
+            
+            // Generate bats flying in the play area (where player jumps)
+            // Bats should be in the area where player can collide with them during jumps
+            float minBatSpacing = 400f;
+            float maxBatSpacing = 600f;
+            
+            float nextBatX = 600f; // First bat position
+            
+            while (nextBatX < WorldWidth - 300)
+            {
+                // Bats fly in the jump zone - between groundTop-200 and groundTop-80
+                // This puts them at Y = 260 to 380 (reachable by jumping)
+                float batY = groundTop - 200f + (float)random.NextDouble() * 120f;
+                
+                bats.Add(new MineBat
+                {
+                    Position = new Vector2(nextBatX, batY),
+                    Velocity = new Vector2(
+                        (float)(random.NextDouble() * 2 - 1) * 60f, 
+                        (float)(random.NextDouble() * 2 - 1) * 40f),
+                    ChangeDirectionTimer = (float)random.NextDouble() * 2f,
+                    Sprite = batSprite
+                });
+                
+                // Random spacing for next bat
+                float spacing = minBatSpacing + (float)random.NextDouble() * (maxBatSpacing - minBatSpacing);
+                nextBatX += spacing;
+            }
         }
 
         public void Update(GameTime gameTime, KeyboardState keyboardState, KeyboardState previousKeyboardState)
         {
-            if (!IsActive) return;
+            if (!IsActive || PlayerDied) return;
 
             float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
-
+            
+            // Player horizontal movement (player controls their movement)
             float move = 0f;
             if (keyboardState.IsKeyDown(Keys.Left) || keyboardState.IsKeyDown(Keys.A))
                 move -= 1f;
             if (keyboardState.IsKeyDown(Keys.Right) || keyboardState.IsKeyDown(Keys.D))
                 move += 1f;
-
+            
             playerVelocity.X = move * GameConstants.MoveSpeed;
-
-            if (playerOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up)))
+            
+            // Jump input
+            if (playerOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up) || keyboardState.IsKeyDown(Keys.W)))
             {
                 playerVelocity.Y = GameConstants.JumpVelocity;
                 playerOnGround = false;
             }
 
+            // Apply gravity
             playerVelocity.Y += GameConstants.Gravity * deltaTime;
+            
+            // Update player position
             playerPosition += playerVelocity * deltaTime;
+            
+            // Clamp player to world bounds
+            if (playerPosition.X < 0)
+                playerPosition.X = 0;
+            if (playerPosition.X + GameConstants.PlayerSize.X > WorldWidth)
+                playerPosition.X = WorldWidth - GameConstants.PlayerSize.X;
 
+            // Ground collision
+            float groundTop = ScreenHeight - GroundHeight;
             playerOnGround = false;
-            Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, 
-                (int)GameConstants.PlayerSize.X, (int)GameConstants.PlayerSize.Y);
-
-            foreach (Rectangle platform in platforms)
+            
+            if (playerPosition.Y + GameConstants.PlayerSize.Y >= groundTop)
             {
-                Vector2 correctedPos;
-                if (PlatformerPhysics.CheckPlatformCollision(playerRect, platform, playerVelocity, out correctedPos))
+                playerPosition.Y = groundTop - GameConstants.PlayerSize.Y;
+                playerVelocity.Y = 0f;
+                playerOnGround = true;
+            }
+            
+            // Update camera to follow player (only moves when player moves)
+            UpdateCamera();
+            
+            // Update carts - they move toward the player on tracks
+            foreach (var cart in carts)
+            {
+                // Move cart toward player (left direction)
+                cart.Position += new Vector2(cart.Velocity.X * deltaTime, 0);
+                
+                // Remove carts that go off the left side of the world
+                // (they're handled below in collision, but stop at world edge)
+                if (cart.Position.X < -50)
                 {
-                    playerPosition.Y = correctedPos.Y;
-                    playerVelocity.Y = 0f;
-                    playerOnGround = true;
-                    playerRect.Y = (int)playerPosition.Y;
+                    cart.Position = new Vector2(-50, cart.Position.Y);
                 }
             }
 
-            PlatformerPhysics.ClampToScreen(ref playerPosition, GameConstants.PlayerSize);
-
-            foreach (var cart in carts)
-            {
-                cart.Update(deltaTime);
-            }
-
+            // Update bats (they move around)
             foreach (var bat in bats)
             {
-                bat.Update(deltaTime, random);
+                bat.ChangeDirectionTimer -= deltaTime;
+                
+                if (bat.ChangeDirectionTimer <= 0)
+                {
+                    bat.Velocity = new Vector2(
+                        (float)(random.NextDouble() * 2 - 1) * 60f, 
+                        (float)(random.NextDouble() * 2 - 1) * 40f);
+                    bat.ChangeDirectionTimer = 1.5f + (float)random.NextDouble();
+                }
+                
+                bat.Position += bat.Velocity * deltaTime;
+                
+                // Keep bats in the jump zone (where player can reach them)
+                float minBatY = groundTop - 200f; // Top of jump zone
+                float maxBatY = groundTop - 60f;  // Just above ground
+                
+                if (bat.Position.Y < minBatY)
+                {
+                    bat.Position = new Vector2(bat.Position.X, minBatY);
+                    bat.Velocity = new Vector2(bat.Velocity.X, Math.Abs(bat.Velocity.Y));
+                }
+                if (bat.Position.Y > maxBatY)
+                {
+                    bat.Position = new Vector2(bat.Position.X, maxBatY);
+                    bat.Velocity = new Vector2(bat.Velocity.X, -Math.Abs(bat.Velocity.Y));
+                }
             }
 
+            // Check collision with carts
+            Rectangle playerRect = new Rectangle(
+                (int)playerPosition.X, 
+                (int)playerPosition.Y, 
+                (int)GameConstants.PlayerSize.X, 
+                (int)GameConstants.PlayerSize.Y);
+            
+            foreach (var cart in carts)
+            {
+                Rectangle cartRect = cart.Bounds;
+                if (playerRect.Intersects(cartRect))
+                {
+                    PlayerDied = true;
+                    return;
+                }
+            }
+            
+            // Check collision with stalactites
+            foreach (var stalactite in stalactites)
+            {
+                Rectangle stalactiteRect = new Rectangle(
+                    (int)stalactite.Position.X,
+                    (int)stalactite.Position.Y,
+                    (int)stalactite.Size.X,
+                    (int)stalactite.Size.Y);
+                    
+                if (playerRect.Intersects(stalactiteRect))
+                {
+                    PlayerDied = true;
+                    return;
+                }
+            }
+            
+            // Check collision with bats
+            foreach (var bat in bats)
+            {
+                if (playerRect.Intersects(bat.Bounds))
+                {
+                    PlayerDied = true;
+                    return;
+                }
+            }
+
+            // Check if player reached the item
             if (!itemCollected && keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E))
             {
-                playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, 
-                    (int)GameConstants.PlayerSize.X, (int)GameConstants.PlayerSize.Y);
-                if (playerRect.Intersects(itemRect))
+                Rectangle expandedItemRect = itemRect;
+                expandedItemRect.Inflate(20, 20);
+                if (playerRect.Intersects(expandedItemRect))
                 {
                     itemCollected = true;
                     HasCollectedItem = true;
                 }
             }
-
-            playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, 
-                (int)GameConstants.PlayerSize.X, (int)GameConstants.PlayerSize.Y);
-            if (playerRect.Intersects(exitRect))
+            
+            // Check if player reached end of level and wants to exit
+            if (playerPosition.X >= WorldWidth - 100 && playerPosition.X <= WorldWidth - 20)
             {
-                IsActive = false;
+                // Player is at the exit area
+                if (keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E))
+                {
+                    IsActive = false;
+                }
             }
-
-            if (playerPosition.Y > GameConstants.BaseScreenSize.Y)
-            {
-                playerPosition = new Vector2(50f, GameConstants.BaseScreenSize.Y - GameConstants.PlayerSize.Y - 30f);
-                playerVelocity = Vector2.Zero;
-            }
+        }
+        
+        private void UpdateCamera()
+        {
+            // Camera follows player, keeping them roughly centered horizontally
+            // but only moves when player moves past certain thresholds
+            float targetCameraX = playerPosition.X - ScreenWidth * 0.3f;
+            
+            // Clamp camera to world bounds
+            targetCameraX = MathHelper.Clamp(targetCameraX, 0, WorldWidth - ScreenWidth);
+            
+            // Smooth camera follow
+            cameraOffset.X = MathHelper.Lerp(cameraOffset.X, targetCameraX, 0.1f);
+            cameraOffset.Y = 0; // No vertical scrolling
         }
 
         public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, GameTime gameTime, 
@@ -234,69 +383,182 @@ namespace ProjectZeus.Core.Levels
         {
             if (!IsActive) return;
 
+            // Clear to dark mine color
             graphicsDevice.Clear(new Color(20, 15, 30));
-
-            Rectangle bgRect = new Rectangle(0, 0, (int)GameConstants.BaseScreenSize.X, (int)GameConstants.BaseScreenSize.Y);
-            spriteBatch.Draw(backgroundTexture, bgRect, Color.White);
-
-            foreach (Stalactite stalactite in stalactites)
+            
+            // Draw background
+            DrawBackground(spriteBatch);
+            
+            // Draw ceiling (top of screen)
+            Rectangle ceilingRect = new Rectangle((int)cameraOffset.X, 0, (int)ScreenWidth + 100, 30);
+            spriteBatch.Draw(solidTexture, ceilingRect, new Color(60, 50, 40));
+            
+            // Draw stalactites
+            foreach (var stalactite in stalactites)
             {
-                stalactite.Draw(spriteBatch, platformTexture, gameTime);
-            }
-
-            foreach (Rectangle platform in platforms)
-            {
-                spriteBatch.Draw(platformTexture, platform, new Color(80, 70, 60));
-            }
-
-            foreach (Rectangle rail in rails)
-            {
-                spriteBatch.Draw(platformTexture, rail, new Color(140, 140, 140));
-                for (int x = rail.Left; x < rail.Right; x += 15)
+                if (stalactite.Position.X >= cameraOffset.X - 50 && 
+                    stalactite.Position.X <= cameraOffset.X + ScreenWidth + 50)
                 {
-                    Rectangle tie = new Rectangle(x, rail.Top - 3, 3, 8);
-                    spriteBatch.Draw(platformTexture, tie, new Color(100, 70, 50));
+                    stalactite.Draw(spriteBatch, solidTexture, gameTime);
                 }
             }
-
+            
+            // Draw ground
+            spriteBatch.Draw(solidTexture, groundRect, new Color(80, 70, 60));
+            
+            // Draw rails on ground (where carts drive)
+            DrawRails(spriteBatch);
+            
+            // Draw carts (on the rails)
             foreach (var cart in carts)
             {
-                cart.Draw(spriteBatch, platformTexture, gameTime);
+                if (cart.Position.X >= cameraOffset.X - 100 && 
+                    cart.Position.X <= cameraOffset.X + ScreenWidth + 100)
+                {
+                    cart.Draw(spriteBatch, solidTexture, gameTime);
+                }
             }
-
-            float flickerTime = (float)gameTime.TotalGameTime.TotalSeconds;
-            foreach (Rectangle torch in torches)
-            {
-                spriteBatch.Draw(platformTexture, torch, new Color(101, 67, 33));
-                float flicker = (float)Math.Sin(flickerTime * 8f) * 0.2f + 0.8f;
-                Rectangle flame = new Rectangle(torch.X - 5, torch.Y - 15, torch.Width + 10, 15);
-                spriteBatch.Draw(platformTexture, flame, new Color((byte)(255 * flicker), (byte)(200 * flicker), 50));
-            }
-
-            if (!itemCollected)
-            {
-                spriteBatch.Draw(platformTexture, itemRect, Color.Gold);
-                Rectangle glowRect = itemRect;
-                glowRect.Inflate(5, 5);
-                spriteBatch.Draw(platformTexture, glowRect, new Color((byte)255, (byte)215, (byte)0, (byte)100));
-            }
-
+            
+            // Draw bats
             foreach (var bat in bats)
             {
-                bat.Draw(spriteBatch, platformTexture, gameTime);
+                if (bat.Position.X >= cameraOffset.X - 50 && 
+                    bat.Position.X <= cameraOffset.X + ScreenWidth + 50)
+                {
+                    bat.Draw(spriteBatch, solidTexture, gameTime);
+                }
             }
-
-            DrawingHelpers.DrawPortal(spriteBatch, portalTexture, exitRect, gameTime, new Color(100, 50, 200));
-
+            
+            // Draw item if not collected
+            if (!itemCollected && itemRect.X >= cameraOffset.X - 50 && 
+                itemRect.X <= cameraOffset.X + ScreenWidth + 50)
+            {
+                spriteBatch.Draw(solidTexture, itemRect, Color.Gold);
+                Rectangle glowRect = itemRect;
+                glowRect.Inflate(5, 5);
+                spriteBatch.Draw(solidTexture, glowRect, new Color(255, 215, 0, 100));
+            }
+            
+            // Draw player
             player.Draw(gameTime, spriteBatch);
+            
+            // Draw torches at intervals for atmosphere (decoration only)
+            DrawTorches(spriteBatch, gameTime);
+        }
+        
+        private void DrawBackground(SpriteBatch spriteBatch)
+        {
+            // Draw dark background
+            Rectangle bgRect = new Rectangle((int)cameraOffset.X, 0, (int)ScreenWidth + 100, (int)ScreenHeight);
+            spriteBatch.Draw(solidTexture, bgRect, new Color(20, 15, 30));
+            
+            // Draw some background rock texture variation
+            for (int x = (int)(cameraOffset.X / 200) * 200; x < cameraOffset.X + ScreenWidth + 200; x += 200)
+            {
+                // Darker patches for depth
+                int patchY = 100 + (x / 200 % 3) * 80;
+                Rectangle patch = new Rectangle(x, patchY, 150, 100);
+                spriteBatch.Draw(solidTexture, patch, new Color(15, 10, 25));
+            }
+        }
+        
+        private void DrawRails(SpriteBatch spriteBatch)
+        {
+            float groundTop = ScreenHeight - GroundHeight;
+            
+            // Draw two parallel rails
+            int railY1 = (int)(groundTop - 8);
+            int railY2 = (int)(groundTop - 3);
+            
+            // Left rail
+            Rectangle leftRail = new Rectangle(0, railY1, (int)WorldWidth, 3);
+            spriteBatch.Draw(solidTexture, leftRail, new Color(100, 100, 110));
+            
+            // Right rail  
+            Rectangle rightRail = new Rectangle(0, railY2, (int)WorldWidth, 3);
+            spriteBatch.Draw(solidTexture, rightRail, new Color(100, 100, 110));
+            
+            // Draw rail ties (wooden planks across the rails)
+            for (int x = 0; x < WorldWidth; x += 25)
+            {
+                if (x >= cameraOffset.X - 30 && x <= cameraOffset.X + ScreenWidth + 30)
+                {
+                    Rectangle tie = new Rectangle(x, railY1 - 2, 15, 12);
+                    spriteBatch.Draw(solidTexture, tie, new Color(101, 67, 33));
+                }
+            }
+        }
+        
+        private void DrawTorches(SpriteBatch spriteBatch, GameTime gameTime)
+        {
+            float flickerTime = (float)gameTime.TotalGameTime.TotalSeconds;
+            float groundTop = ScreenHeight - GroundHeight;
+            
+            // Draw torches every 300 pixels (decoration only, mounted on ground level)
+            for (int x = 100; x < WorldWidth; x += 300)
+            {
+                if (x >= cameraOffset.X - 50 && x <= cameraOffset.X + ScreenWidth + 50)
+                {
+                    // Torch post standing on ground
+                    Rectangle torchPost = new Rectangle(x, (int)(groundTop - 45), 8, 45);
+                    spriteBatch.Draw(solidTexture, torchPost, new Color(101, 67, 33));
+                    
+                    // Torch holder/bracket at top
+                    Rectangle bracket = new Rectangle(x - 3, (int)(groundTop - 50), 14, 8);
+                    spriteBatch.Draw(solidTexture, bracket, new Color(80, 50, 25));
+                    
+                    // Flame with flicker
+                    float flicker = (float)Math.Sin(flickerTime * 8f + x * 0.1f) * 0.2f + 0.8f;
+                    Rectangle flame = new Rectangle(x - 4, (int)(groundTop - 65), 16, 15);
+                    spriteBatch.Draw(solidTexture, flame, new Color((byte)(255 * flicker), (byte)(200 * flicker), 50));
+                    
+                    // Inner flame (brighter)
+                    Rectangle innerFlame = new Rectangle(x - 1, (int)(groundTop - 62), 10, 10);
+                    spriteBatch.Draw(solidTexture, innerFlame, new Color((byte)(255 * flicker), (byte)(255 * flicker), 100));
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Draws UI elements that should not be affected by camera
+        /// </summary>
+        public void DrawUI(SpriteBatch spriteBatch)
+        {
+            if (!IsActive) return;
+            
+            // Draw instructions
+            string instructions = "Arrow keys to move, SPACE to jump! Avoid carts, stalactites, and bats!";
+            Vector2 instructionsSize = font.MeasureString(instructions);
+            Vector2 instructionsPos = new Vector2((ScreenWidth - instructionsSize.X) / 2f, 10f);
+            spriteBatch.DrawString(font, instructions, instructionsPos, Color.White);
+            
+            // Draw progress
+            float progress = playerPosition.X / WorldWidth * 100f;
+            string progressText = $"Progress: {progress:F0}%";
+            spriteBatch.DrawString(font, progressText, new Vector2(10, 40), Color.LightGray);
 
             if (itemCollected)
             {
-                string hasItem = "Item collected! Go to exit portal!";
+                string hasItem = "Item collected! Reach the exit (press E)!";
                 Vector2 hasItemSize = font.MeasureString(hasItem);
-                Vector2 hasItemPos = new Vector2((GameConstants.BaseScreenSize.X - hasItemSize.X) / 2f, 40f);
+                Vector2 hasItemPos = new Vector2((ScreenWidth - hasItemSize.X) / 2f, 70f);
                 spriteBatch.DrawString(font, hasItem, hasItemPos, Color.LightGreen);
             }
+        }
+        
+        /// <summary>
+        /// Resets the level state
+        /// </summary>
+        public void Reset()
+        {
+            IsActive = false;
+            PlayerDied = false;
+            itemCollected = false;
+            HasCollectedItem = false;
+            carts.Clear();
+            stalactites.Clear();
+            bats.Clear();
+            cameraOffset = Vector2.Zero;
         }
     }
 }

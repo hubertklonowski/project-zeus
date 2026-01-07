@@ -151,7 +151,13 @@ namespace ProjectZeus.Core
 
                 case SceneManager.GameScene.MineLevel:
                     sceneManager.MineLevel.Update(gameTime, keyboardState, previousKeyboardState);
-                    if (!sceneManager.MineLevel.IsActive)
+                    
+                    // Handle death - use unified death handler
+                    if (sceneManager.MineLevel.PlayerDied)
+                    {
+                        RespawnAfterDeath();
+                    }
+                    else if (!sceneManager.MineLevel.IsActive)
                     {
                         sceneManager.HandleMineLevelCompletion(ResetPlayerToPillarRoom);
                     }
@@ -345,15 +351,25 @@ namespace ProjectZeus.Core
 
         private void RespawnAfterDeath()
         {
+            // Unified death handler - resets all progress regardless of which level player died in
             sceneManager.CurrentScene = SceneManager.GameScene.PillarRoom;
+            
+            // Reset all levels
             sceneManager.MountainLevel.Reset();
+            sceneManager.MineLevel.Reset();
+            
+            // Clear all collected items
             sceneManager.HasCollectedMountainItem = false;
             sceneManager.HasCollectedMazeItem = false;
             sceneManager.HasCollectedMineItem = false;
+            
+            // Reset pillar room state
             sceneManager.PillarRoom.ResetItems();
             sceneManager.PillarRoom.MazePortal.IsActive = true;
             sceneManager.PillarRoom.MountainPortal.IsActive = true;
             sceneManager.PillarRoom.MinePortal.IsActive = true;
+            
+            // Reset player position
             ResetPlayerToPillarRoom();
         }
 
@@ -378,9 +394,16 @@ namespace ProjectZeus.Core
                     break;
 
                 case SceneManager.GameScene.MineLevel:
-                    spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, globalTransformation);
+                    // Draw world with camera transform
+                    spriteBatch.Begin(SpriteSortMode.Deferred, null, null, null, null, null, 
+                        sceneManager.MineLevel.GetCameraTransform());
                     sceneManager.MineLevel.Draw(spriteBatch, GraphicsDevice, gameTime, player,
                         DrawingHelpers.CreateSolidTexture(GraphicsDevice, 1, 1, Color.White));
+                    spriteBatch.End();
+                    
+                    // Draw UI without camera transform
+                    spriteBatch.Begin();
+                    sceneManager.MineLevel.DrawUI(spriteBatch);
                     spriteBatch.End();
                     break;
 
