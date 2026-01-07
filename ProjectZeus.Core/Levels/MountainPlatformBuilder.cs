@@ -83,12 +83,12 @@ namespace ProjectZeus.Core.Levels
         /// </summary>
         private static int GetPlatformCount(int level, int totalLevels)
         {
-            // Reduce platforms near the summit for increased difficulty
+            // Reduced platform count across all levels for increased difficulty
             if (level >= totalLevels - 2)
-                return 3;
+                return 2; // Was 3
             if (level >= totalLevels - 4)
-                return 4;
-            return PlatformsPerLevel;
+                return 3; // Was 4
+            return 3; // Was 5 - reduced everywhere
         }
         
         /// <summary>

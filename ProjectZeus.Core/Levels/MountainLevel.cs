@@ -51,7 +51,7 @@ namespace ProjectZeus.Core
         private Vector2 goatPosition;
         private readonly Vector2 goatSize = new Vector2(40, 40);
         private float goatThrowTimer;
-        private const float GoatThrowInterval = 2.5f;
+        private const float GoatThrowInterval = 1.5f; // Increased frequency - was 2.5f
         private Vector2 goatVelocity;
         private const float GoatMoveSpeed = 60f;
         private Rectangle topPlatformBounds;

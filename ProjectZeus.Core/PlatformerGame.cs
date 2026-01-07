@@ -245,13 +245,13 @@ namespace ProjectZeus.Core
                 }
             }
 
-            if (sceneManager.PillarRoom.MazePortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMazeItem)
+            if (eKeyPressed && sceneManager.PillarRoom.MazePortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMazeItem)
             {
                 sceneManager.CurrentScene = SceneManager.GameScene.MazeLevel;
                 return;
             }
 
-            if (sceneManager.PillarRoom.MinePortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMineItem)
+            if (eKeyPressed && sceneManager.PillarRoom.MinePortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMineItem)
             {
                 sceneManager.CurrentScene = SceneManager.GameScene.MineLevel;
                 sceneManager.MineLevel.Enter();
@@ -294,7 +294,9 @@ namespace ProjectZeus.Core
 
             if (player.IsOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up)))
             {
-                player.Velocity = new Vector2(player.Velocity.X, GameConstants.JumpVelocity);
+                // Reduced jump height for mountain level to increase difficulty
+                float mountainJumpVelocity = GameConstants.JumpVelocity * 0.75f; // 25% reduction
+                player.Velocity = new Vector2(player.Velocity.X, mountainJumpVelocity);
                 player.IsOnGround = false;
             }
 
