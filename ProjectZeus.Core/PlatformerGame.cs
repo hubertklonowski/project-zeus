@@ -256,7 +256,8 @@ namespace ProjectZeus.Core
             {
                 sceneManager.CurrentScene = SceneManager.GameScene.MountainLevel;
                 sceneManager.MountainLevel.Reset();
-                player.Position = new Vector2(60f, groundTop - playerSize.Y);
+                // Spawn player at the bottom of the extended mountain level
+                player.Position = sceneManager.MountainLevel.GetPlayerSpawnPosition(playerSize);
                 player.Velocity = Vector2.Zero;
                 player.IsOnGround = true;
                 return;
@@ -276,7 +277,6 @@ namespace ProjectZeus.Core
         private void UpdateMountainLevel(GameTime gameTime)
         {
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
-            float groundTop = GameConstants.BaseScreenSize.Y - GameConstants.GroundHeight;
 
             float move = 0f;
             if (keyboardState.IsKeyDown(Keys.Left) || keyboardState.IsKeyDown(Keys.A))
@@ -307,9 +307,27 @@ namespace ProjectZeus.Core
                 player.Velocity = new Vector2(player.Velocity.X, 0f);
             }
 
-            Vector2 tempPos2 = player.Position;
-            Physics.PlatformerPhysics.ClampToScreen(ref tempPos2, playerSize);
-            player.Position = tempPos2;
+            // Clamp player X position to screen bounds, Y position to world bounds
+            Vector2 tempPos = player.Position;
+            
+            // Clamp X to screen
+            if (tempPos.X < 0)
+                tempPos.X = 0;
+            if (tempPos.X + playerSize.X > GameConstants.BaseScreenSize.X)
+                tempPos.X = GameConstants.BaseScreenSize.X - playerSize.X;
+            
+            // Clamp Y to world bounds (extended level height)
+            float worldHeight = sceneManager.MountainLevel.WorldHeight;
+            if (tempPos.Y < 0)
+                tempPos.Y = 0;
+            if (tempPos.Y + playerSize.Y > worldHeight - GameConstants.GroundHeight)
+            {
+                tempPos.Y = worldHeight - GameConstants.GroundHeight - playerSize.Y;
+                player.Velocity = new Vector2(player.Velocity.X, 0f);
+                player.IsOnGround = true;
+            }
+            
+            player.Position = tempPos;
 
             bool tryPickupItem = keyboardState.IsKeyDown(Keys.E);
             sceneManager.MountainLevel.Update(gameTime, player.Position, playerSize, tryPickupItem);
@@ -353,7 +371,8 @@ namespace ProjectZeus.Core
 
                 case SceneManager.GameScene.MountainLevel:
                     sceneManager.MountainLevel.Draw(spriteBatch, GraphicsDevice, gameTime);
-                    spriteBatch.Begin();
+                    // Draw player with camera transform applied
+                    spriteBatch.Begin(transformMatrix: sceneManager.MountainLevel.GetCameraTransform());
                     player.Draw(gameTime, spriteBatch);
                     spriteBatch.End();
                     break;

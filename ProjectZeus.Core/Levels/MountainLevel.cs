@@ -20,6 +20,12 @@ namespace ProjectZeus.Core
     {
         private readonly Vector2 baseScreenSize = new Vector2(800, 480);
         
+        // World dimensions - level spans multiple screens vertically
+        private float worldHeight;
+        
+        // Camera offset for scrolling
+        private Vector2 cameraOffset;
+        
         // Textures
         private Texture2D solidTexture;
         private AsepriteSprite goatSprite;
@@ -61,6 +67,16 @@ namespace ProjectZeus.Core
         public bool PlayerDied { get; private set; }
         public bool ItemWasCollected { get; private set; }
         
+        /// <summary>
+        /// Gets the total world height for the level
+        /// </summary>
+        public float WorldHeight => worldHeight;
+        
+        /// <summary>
+        /// Gets the current camera offset for rendering
+        /// </summary>
+        public Vector2 CameraOffset => cameraOffset;
+        
         public MountainLevel()
         {
             platforms = new List<Platform>();
@@ -68,6 +84,7 @@ namespace ProjectZeus.Core
             itemCollected = false;
             PlayerDied = false;
             ItemWasCollected = false;
+            cameraOffset = Vector2.Zero;
         }
         
         public void LoadContent(GraphicsDevice graphicsDevice, SpriteFont font)
@@ -86,9 +103,18 @@ namespace ProjectZeus.Core
             
             // Build the mountain structure with platforms
             SetupMountain();
+        }
+        
+        private void SetupMountain()
+        {
+            // Get world height from the platform builder
+            worldHeight = MountainPlatformBuilder.WorldHeight;
             
-            // The top platform is now much higher and the maze is more complex
-            float topPlatformY = 30f; // Much higher up for more challenging level
+            // Build platforms
+            platforms = MountainPlatformBuilder.BuildPlatforms(baseScreenSize);
+            
+            // The top platform is at the very top of the extended world
+            float topPlatformY = MountainPlatformBuilder.GetTopPlatformY();
             float topPlatformWidth = 300f;
             float topPlatformX = baseScreenSize.X / 2f - topPlatformWidth / 2f;
             
@@ -105,16 +131,44 @@ namespace ProjectZeus.Core
             
             // Position item on the top platform with the goat
             itemPosition = new Vector2(topPlatformX + topPlatformWidth - 60f, topPlatformY - itemSize.Y);
+            
+            // Initialize camera to show bottom of level (where player starts)
+            cameraOffset = new Vector2(0, worldHeight - baseScreenSize.Y);
         }
         
-        private void SetupMountain()
+        /// <summary>
+        /// Updates the camera position to follow the player
+        /// </summary>
+        public void UpdateCamera(Vector2 playerPosition)
         {
-            platforms = MountainPlatformBuilder.BuildPlatforms(baseScreenSize);
+            // Camera follows player vertically, keeping player in center-bottom portion of screen
+            float targetCameraY = playerPosition.Y - baseScreenSize.Y * 0.6f;
+            
+            // Clamp camera to world bounds
+            targetCameraY = MathHelper.Clamp(targetCameraY, 0, worldHeight - baseScreenSize.Y);
+            
+            // Smooth camera follow
+            cameraOffset.Y = MathHelper.Lerp(cameraOffset.Y, targetCameraY, 0.1f);
+            
+            // Keep X at 0 (no horizontal scrolling)
+            cameraOffset.X = 0;
+        }
+        
+        /// <summary>
+        /// Gets the player's spawn position at the bottom of the level
+        /// </summary>
+        public Vector2 GetPlayerSpawnPosition(Vector2 playerSize)
+        {
+            float groundTop = worldHeight - 20; // Ground is at bottom of world
+            return new Vector2(60f, groundTop - playerSize.Y);
         }
         
         public void Update(GameTime gameTime, Vector2 playerPosition, Vector2 playerSize, bool tryPickupItem)
         {
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            
+            // Update camera to follow player
+            UpdateCamera(playerPosition);
             
             // Update goat movement (patrol back and forth on top platform)
             goatPosition += goatVelocity * dt;
@@ -145,8 +199,8 @@ namespace ProjectZeus.Core
                 rocks[i].Position += rocks[i].Velocity * dt;
                 rocks[i].Rotation += rocks[i].RotationSpeed * dt;
                 
-                // Remove rocks that go off screen
-                if (rocks[i].Position.Y > baseScreenSize.Y + 50)
+                // Remove rocks that go off the bottom of the world
+                if (rocks[i].Position.Y > worldHeight + 50)
                 {
                     rocks.RemoveAt(i);
                     continue;
@@ -257,10 +311,13 @@ namespace ProjectZeus.Core
             if (solidTexture == null)
                 return;
             
-            spriteBatch.Begin();
+            // Create camera transformation matrix
+            Matrix cameraTransform = Matrix.CreateTranslation(-cameraOffset.X, -cameraOffset.Y, 0);
             
-            // Draw sky background
-            Rectangle skyRect = new Rectangle(0, 0, (int)baseScreenSize.X, (int)baseScreenSize.Y);
+            spriteBatch.Begin(transformMatrix: cameraTransform);
+            
+            // Draw sky background (stretched to cover visible area)
+            Rectangle skyRect = new Rectangle(0, (int)cameraOffset.Y, (int)baseScreenSize.X, (int)baseScreenSize.Y);
             spriteBatch.Draw(solidTexture, skyRect, new Color(135, 206, 235));
             
             // Draw mountain body (triangular shape in background)
@@ -358,6 +415,11 @@ namespace ProjectZeus.Core
                 DrawRectangleOutline(spriteBatch, itemRect, Color.Yellow);
             }
             
+            spriteBatch.End();
+            
+            // Draw UI elements (not affected by camera)
+            spriteBatch.Begin();
+            
             // Draw title
             if (font != null)
             {
@@ -370,27 +432,37 @@ namespace ProjectZeus.Core
             spriteBatch.End();
         }
         
+        /// <summary>
+        /// Draws the player with camera offset applied. Call this after Draw() with a separate SpriteBatch.
+        /// </summary>
+        public Matrix GetCameraTransform()
+        {
+            return Matrix.CreateTranslation(-cameraOffset.X, -cameraOffset.Y, 0);
+        }
+        
         private void DrawMountainBackground(SpriteBatch spriteBatch)
         {
             // Draw a simple triangular mountain shape in the background
+            // Scaled to cover the entire world height
             Color mountainColor = new Color(160, 140, 120);
             
             // Draw mountain as a series of horizontal strips getting narrower toward top
-            int strips = 30;
-            float baseWidth = baseScreenSize.X * 0.8f;
-            float startX = baseScreenSize.X * 0.1f;
-            float bottomY = baseScreenSize.Y - 20;
-            float topY = 50;
+            int strips = 100; // More strips for taller mountain
+            float baseWidth = baseScreenSize.X * 0.9f;
+            float startX = baseScreenSize.X * 0.05f;
+            float bottomY = worldHeight - 20;
+            float topY = 20;
             
             for (int i = 0; i < strips; i++)
             {
                 float t = (float)i / strips;
                 float y = MathHelper.Lerp(bottomY, topY, t);
-                float width = baseWidth * (1 - t);
+                float width = baseWidth * (1 - t * 0.8f); // Narrower at top
                 float x = startX + (baseWidth - width) / 2f;
                 
-                Rectangle strip = new Rectangle((int)x, (int)y, (int)width, (int)((bottomY - topY) / strips) + 2);
-                spriteBatch.Draw(solidTexture, strip, mountainColor * (0.3f + t * 0.3f));
+                float stripHeight = (bottomY - topY) / strips + 2;
+                Rectangle strip = new Rectangle((int)x, (int)y, (int)width, (int)stripHeight);
+                spriteBatch.Draw(solidTexture, strip, mountainColor * (0.2f + t * 0.4f));
             }
         }
         
@@ -416,6 +488,9 @@ namespace ProjectZeus.Core
                 goatPosition = new Vector2(topPlatformBounds.X + 50f, topPlatformBounds.Y - goatSize.Y);
                 goatVelocity = new Vector2(GoatMoveSpeed, 0f);
             }
+            
+            // Reset camera to show bottom of level
+            cameraOffset = new Vector2(0, worldHeight - baseScreenSize.Y);
         }
     }
 }
