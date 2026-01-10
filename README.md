@@ -178,7 +178,7 @@ This project is provided as-is for educational purposes.
 
 This is a personal learning project, but suggestions and feedback are welcome through GitHub issues.
 
-## 👤 Author
+## 👤 Authors
 
 **Hubert Klonowski**
 - [@hubertklonowski](https://github.com/hubertklonowski)
