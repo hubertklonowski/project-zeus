@@ -453,6 +453,21 @@ namespace ProjectZeus.Core
                     Exit();
             }
 
+#if DEBUG
+            // F key shortcut to jump to Zeus fight scene
+            if (keyboardState.IsKeyDown(Keys.F) && !previousKeyboardState.IsKeyDown(Keys.F))
+            {
+                sceneManager.CurrentScene = SceneManager.GameScene.ZeusFight;
+                float fightGroundTop = GameConstants.BaseScreenSize.Y * 0.7f;
+                // Position player on the right side, facing left toward Zeus
+                player.Position = new Vector2(GameConstants.BaseScreenSize.X - player.Size.X - 40f, 
+                    fightGroundTop - player.Size.Y);
+                // Set negative velocity to make player face left
+                player.Velocity = new Vector2(-1f, 0f);
+                player.IsOnGround = true;
+            }
+#endif
+
             virtualGamePad.Update(gameTime);
         }
     }
