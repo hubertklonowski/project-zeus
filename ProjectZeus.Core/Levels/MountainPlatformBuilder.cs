@@ -82,9 +82,10 @@ namespace ProjectZeus.Core.Levels
             }
             
             // Add the final goat platform at the top - increased width for goat and item
+            // Positioned lower to be reachable and ensure goat is fully visible
             staticPlatforms.Add(new Platform
             {
-                Position = new Vector2(screenSize.X / 2f - 200f, baseY - 2120),
+                Position = new Vector2(screenSize.X / 2f - 200f, baseY - 2080),
                 Size = new Vector2(400, PlatformHeight),
                 Color = LevelColors[^1]
             });
@@ -272,7 +273,7 @@ namespace ProjectZeus.Core.Levels
         /// </summary>
         public static float GetTopPlatformY()
         {
-            return WorldHeight - GroundHeight - 2120;
+            return WorldHeight - GroundHeight - 2080;
         }
     }
 }
