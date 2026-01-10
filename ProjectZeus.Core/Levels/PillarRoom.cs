@@ -294,12 +294,14 @@ namespace ProjectZeus.Core.Levels
             if (minePortal.IsActive)
             {
                 DrawingHelpers.DrawPortal(spriteBatch, portalTexture, minePortal.Bounds, gameTime, minePortal.BaseColor);
-                // Draw level name above portal
+                // Draw level name above portal at same height as other portals
                 string levelName = "Mine";
                 Vector2 textSize = font.MeasureString(levelName);
+                // Use bottom of portal instead of top to keep text at consistent height relative to ground
+                float groundTop = GameConstants.BaseScreenSize.Y - GameConstants.GroundHeight;
                 Vector2 textPos = new Vector2(
                     minePortal.Position.X + minePortal.Size.X / 2f - textSize.X / 2f,
-                    minePortal.Position.Y - textSize.Y - 5f);
+                    groundTop - 80f - textSize.Y - 5f); // 80f is standard portal height
                 spriteBatch.DrawString(font, levelName, textPos, Color.White);
             }
         }
