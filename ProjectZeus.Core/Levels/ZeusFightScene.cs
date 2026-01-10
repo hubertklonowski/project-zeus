@@ -19,7 +19,6 @@ namespace ProjectZeus.Core
         private AsepriteSprite zeusSprite;
         
         private Vector2 zeusPosition;
-        private readonly Vector2 zeusSize = new Vector2(80, 120);
 
         public ZeusFightScene()
         {
@@ -37,9 +36,14 @@ namespace ProjectZeus.Core
             // Load Zeus sprite
             zeusSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/zus.aseprite");
             
-            // Position Zeus on the left side of the screen
-            float groundTop = baseScreenSize.Y * 0.7f;
+            // Position Zeus on the left side of the screen, standing on ground
+            float groundTop = baseScreenSize.Y * 0.7f; // This is where ground starts (y = 336)
             float zeusMarginFromLeft = 40f;
+            
+            // Use actual sprite size if loaded, otherwise use fallback dimensions
+            Vector2 zeusSize = zeusSprite?.IsLoaded == true ? zeusSprite.Size : new Vector2(80, 120);
+            
+            // Zeus should be positioned so his bottom is at groundTop
             zeusPosition = new Vector2(zeusMarginFromLeft, groundTop - zeusSize.Y);
         }
 
@@ -72,7 +76,8 @@ namespace ProjectZeus.Core
             }
             else
             {
-                // Fallback rendering
+                // Fallback rendering - use actual sprite size if available
+                Vector2 zeusSize = zeusSprite?.IsLoaded == true ? zeusSprite.Size : new Vector2(80, 120);
                 Rectangle zeusRect = new Rectangle(
                     (int)zeusPosition.X,
                     (int)zeusPosition.Y,
@@ -82,14 +87,6 @@ namespace ProjectZeus.Core
             }
 
             player.Draw(gameTime, spriteBatch);
-
-            if (titleFont != null)
-            {
-                string title = "Zeus Fight";
-                Vector2 size = titleFont.MeasureString(title);
-                Vector2 pos = new Vector2((baseScreenSize.X - size.X) / 2f, 40f);
-                spriteBatch.DrawString(titleFont, title, pos, Color.Gold);
-            }
 
             spriteBatch.End();
         }
