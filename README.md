@@ -132,7 +132,7 @@ Music playback is supported on Windows platforms. The game includes background m
 ### Architecture
 
 - **Game Engine**: MonoGame (based on XNA Framework)
-- **Target Framework**: .NET 8
+- **Target Framework**: .NET 10
 - **Platform**: Windows DirectX
 - **Sprite System**: Custom Aseprite integration using MonoGame.Aseprite and AsepriteDotNet
 - **Physics**: Custom platformer physics with gravity and collision detection
@@ -181,8 +181,8 @@ This is a personal learning project, but suggestions and feedback are welcome th
 ## 👤 Author
 
 **Hubert Klonowski**
-- GitHub: [@hubertklonowski](https://github.com/hubertklonowski)
-- [@tanczacypor](https://lh3.googleusercontent.com/rd-gg-dl/ABS2GSlbgKJxZ8ioXgPvkiup0C24Dt0xTNzgAaiLCx-vnxomAq3-3944FO9Vy7drRTtIKNu5aLd8-XuHpjmQpnxsaTa6unn9cqlvDdMQ4531D4Sl5PF_9WKF9z9u4GPDV3V13DlmLXtMxDJCb0Zr_isDIECoPX4qVie8kNPc2iDTGrPsO31lMBAChi1e_2wPQLHDqdBELNRXi0PcRnUsYhNAqkq-u8PYAzGPj3X2n43PSYDjjDThUuxJMqXvkxBIpSwC8X3Ykysb6L6mfrlG6j8OveZrCzXW-toKGUK2Wg2YQNcSoM3q88N8c1ih40XBfTwVv-zifCg74pTTS1CeRJmM_79CJxGX4uPGOzte9Sf66QdPYbtyDOboqsV09vHZg2HrUOXOp7ayWviEuSlAcISOpwgAJCcqzL_oeuy_JLeb4b3sh-5Vz96i1SUgNlvv0wkmvrje3XnTPmUOi-0TAjgFGJo-_6lNKBPJMZQENmU2GtmFhviRZWB1n0xxAq_kpHVeHl0_n5_nAdm-0AEGkgJlphhrKqs-CXphaXePJiiNmHCwYCy563WLuB46CBQMqKrreGU63MPfhKmrIyf6tk3KezmwcW6f4ycE9IF5zqqiQV8gPyGQ26mOwbnFMQr8eSw1r1qfiO7BnoDWlpwZQPt86kPqSTzS_ZFj6WjUKVtZeO9zGPJdQiK4FfRONXVr8YunWdzOrPLk31jADWq5fVGPAhLb6uqg8OyETgocZeCyn4TF9GP0Hfdv7ry6cHa00liy4TRXoOfP1Zx2LSIJVOmFO33O40HD44RDTXEBxtInDbMHN0c4GUofinOfc9zw1dLmzuQzsOuWhybso67oM2AbygjZavOV6hYeDPVZ7KkaK72VtOvRvY2Qi0HJbo76d_cBQ-Ftls46Bfib3h36Ctz255dDULKe4Wtj4K526rLk2fSe3Yr3U3gRUiB0tMP80svcUr8VNfOlq8GUY_m8UFl9h8Vc73NLkJeUPFDDdb0euMJkm-VO33vqfK8MOyiAvSO7iQqcH5NPinhKqcvylfxjZb1tgTh1xPpDJAyhC2nv8yK5wIeCrbBUBS0ul8ae_LR2CqSlWv-T_eIGXMkEwK-l-aY1H8rQTipX5enkpaWS4r78zFrimO-IfpLVl32J6QALjvoFzzdc5uG0J_uxUoAHKA36kjxvBZZLzgKFqTbuxBo1pXukJ9TUgw=s1024-rj)
+- [@hubertklonowski](https://github.com/hubertklonowski)
+- [@tanczacypor](https://imgur.com/f07f381c-3a1a-47d8-90d4-1d289b0a6cb4)
 
 ## 🙏 Acknowledgments
 
