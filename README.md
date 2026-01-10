@@ -185,5 +185,5 @@ This is a personal learning project, but suggestions and feedback are welcome th
 ## 🙏 Acknowledgments
 
 - Built with [MonoGame](https://www.monogame.net/)
-- Sprite handling via [MonoGame.Aseprite](https://github.com/AristurtleDev/MonoGame.Aseprite)
+- Sprite handling via [MonoGame.Aseprite](https://github.com/AristurtleDev/monogame-aseprite)
 - Inspired by classic platformer games and Greek mythology
