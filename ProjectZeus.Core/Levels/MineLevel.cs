@@ -180,12 +180,13 @@ namespace ProjectZeus.Core.Levels
             {
                 // Stalactites hang from ceiling (Y=30 is below the ceiling graphic)
                 // Make them long enough to reach into jump range
-                int height = 80 + random.Next(100); // 80-180 pixels tall, reaching down to Y=110-210
+                // Player jump reaches approximately Y=285, so stalactites should extend to around Y=250-350
+                int height = 220 + random.Next(130); // 220-350 pixels tall, reaching down to Y=250-380
                 
                 stalactites.Add(new Stalactite
                 {
                     Position = new Vector2(nextStalactiteX, 30), // Start below ceiling
-                    Size = new Vector2(20, height),
+                    Size = new Vector2(40, height), // Width 40 to block player, extended height to reach jump zone
                     Sprite = stalactiteSprite
                 });
                 
@@ -657,23 +658,12 @@ namespace ProjectZeus.Core.Levels
         public void DrawUI(SpriteBatch spriteBatch)
         {
             if (!IsActive) return;
-            
-            // Draw instructions
-            string instructions = "Arrow keys to move, SPACE to jump! Avoid carts, stalactites, bats, and GigaBat!";
-            Vector2 instructionsSize = font.MeasureString(instructions);
-            Vector2 instructionsPos = new Vector2((ScreenWidth - instructionsSize.X) / 2f, 10f);
-            spriteBatch.DrawString(font, instructions, instructionsPos, Color.White);
-            
-            // Draw progress
-            float progress = playerPosition.X / WorldWidth * 100f;
-            string progressText = $"Progress: {progress:F0}%";
-            spriteBatch.DrawString(font, progressText, new Vector2(10, 40), Color.LightGray);
 
             if (itemCollected)
             {
                 string hasItem = "Item collected! Return to the start and exit through the portal!";
                 Vector2 hasItemSize = font.MeasureString(hasItem);
-                Vector2 hasItemPos = new Vector2((ScreenWidth - hasItemSize.X) / 2f, 70f);
+                Vector2 hasItemPos = new Vector2((ScreenWidth - hasItemSize.X) / 2f, 10f);
                 spriteBatch.DrawString(font, hasItem, hasItemPos, Color.LightGreen);
             }
         }

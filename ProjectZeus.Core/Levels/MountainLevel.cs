@@ -119,7 +119,7 @@ namespace ProjectZeus.Core
             
             // The top platform is at the very top of the extended world
             float topPlatformY = MountainPlatformBuilder.GetTopPlatformY();
-            float topPlatformWidth = 300f;
+            float topPlatformWidth = 400f; // Increased from 300f to match MountainPlatformBuilder
             float topPlatformX = baseScreenSize.X / 2f - topPlatformWidth / 2f;
             
             // Store top platform bounds for goat movement constraint

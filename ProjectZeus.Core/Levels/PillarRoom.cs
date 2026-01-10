@@ -267,19 +267,42 @@ namespace ProjectZeus.Core.Levels
 
             }
 
-            if (mazePortal.IsActive && !hasItem)
+            if (mazePortal.IsActive)
             {
                 DrawingHelpers.DrawPortal(spriteBatch, portalTexture, mazePortal.Bounds, gameTime, mazePortal.BaseColor);
+                // Draw level name above portal
+                string levelName = "Maze";
+                Vector2 textSize = font.MeasureString(levelName);
+                Vector2 textPos = new Vector2(
+                    mazePortal.Position.X + mazePortal.Size.X / 2f - textSize.X / 2f,
+                    mazePortal.Position.Y - textSize.Y - 5f);
+                spriteBatch.DrawString(font, levelName, textPos, Color.White);
             }
 
             if (mountainPortal.IsActive)
             {
                 DrawingHelpers.DrawPortal(spriteBatch, portalTexture, mountainPortal.Bounds, gameTime, mountainPortal.BaseColor);
+                // Draw level name above portal
+                string levelName = "Mountain";
+                Vector2 textSize = font.MeasureString(levelName);
+                Vector2 textPos = new Vector2(
+                    mountainPortal.Position.X + mountainPortal.Size.X / 2f - textSize.X / 2f,
+                    mountainPortal.Position.Y - textSize.Y - 5f);
+                spriteBatch.DrawString(font, levelName, textPos, Color.White);
             }
 
             if (minePortal.IsActive)
             {
                 DrawingHelpers.DrawPortal(spriteBatch, portalTexture, minePortal.Bounds, gameTime, minePortal.BaseColor);
+                // Draw level name above portal at same height as other portals
+                string levelName = "Mine";
+                Vector2 textSize = font.MeasureString(levelName);
+                // Use bottom of portal instead of top to keep text at consistent height relative to ground
+                float groundTop = GameConstants.BaseScreenSize.Y - GameConstants.GroundHeight;
+                Vector2 textPos = new Vector2(
+                    minePortal.Position.X + minePortal.Size.X / 2f - textSize.X / 2f,
+                    groundTop - 80f - textSize.Y - 5f); // 80f is standard portal height
+                spriteBatch.DrawString(font, levelName, textPos, Color.White);
             }
         }
 
@@ -302,8 +325,11 @@ namespace ProjectZeus.Core.Levels
                 }
                 else
                 {
-                    // Mine/mountain: colored box for now
-                    spriteBatch.Draw(itemTexture, inventoryRect, Color.Gold);
+                    // Mine/mountain: colored box with correct color
+                    Color itemColor = CurrentCarriedItem == PillarItemType.Mine 
+                        ? Color.DeepSkyBlue 
+                        : Color.Gold; // Mountain item is gold/yellow
+                    spriteBatch.Draw(itemTexture, inventoryRect, itemColor);
                 }
 
                 if (font != null)
