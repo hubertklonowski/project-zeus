@@ -182,7 +182,7 @@ This is a personal learning project, but suggestions and feedback are welcome th
 
 **Hubert Klonowski**
 - [@hubertklonowski](https://github.com/hubertklonowski)
-- [@tanczacypor](https://imgur.com/f07f381c-3a1a-47d8-90d4-1d289b0a6cb4)
+- [@tanczacypor](https://imgur.com/W6qYbRO)
 
 ## 🙏 Acknowledgments
 
