@@ -30,10 +30,15 @@ namespace ProjectZeus.Core.Entities
         {
             Position += new Vector2(Velocity.X * deltaTime, 0);
             
-            if (Position.X < MinX || Position.X > MaxX)
+            // Wrap carts around their track segment instead of simply bouncing
+            // to keep spacing consistent and avoid long periods without carts.
+            float range = MaxX - MinX;
+            if (range > 0f)
             {
-                Velocity = new Vector2(-Velocity.X, Velocity.Y);
-                Position = new Vector2(Math.Max(MinX, Math.Min(MaxX, Position.X)), Position.Y);
+                // Normalize position into [0, range) then offset by MinX
+                float localX = Position.X - MinX;
+                localX = (localX % range + range) % range; // proper modulo for negatives
+                Position = new Vector2(MinX + localX, Position.Y);
             }
         }
         
