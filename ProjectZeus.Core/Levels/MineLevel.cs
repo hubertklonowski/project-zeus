@@ -185,7 +185,7 @@ namespace ProjectZeus.Core.Levels
                 stalactites.Add(new Stalactite
                 {
                     Position = new Vector2(nextStalactiteX, 30), // Start below ceiling
-                    Size = new Vector2(20, height),
+                    Size = new Vector2(40, height), // Increased width from 20 to 40 to block player more
                     Sprite = stalactiteSprite
                 });
                 
@@ -657,23 +657,12 @@ namespace ProjectZeus.Core.Levels
         public void DrawUI(SpriteBatch spriteBatch)
         {
             if (!IsActive) return;
-            
-            // Draw instructions
-            string instructions = "Arrow keys to move, SPACE to jump! Avoid carts, stalactites, bats, and GigaBat!";
-            Vector2 instructionsSize = font.MeasureString(instructions);
-            Vector2 instructionsPos = new Vector2((ScreenWidth - instructionsSize.X) / 2f, 10f);
-            spriteBatch.DrawString(font, instructions, instructionsPos, Color.White);
-            
-            // Draw progress
-            float progress = playerPosition.X / WorldWidth * 100f;
-            string progressText = $"Progress: {progress:F0}%";
-            spriteBatch.DrawString(font, progressText, new Vector2(10, 40), Color.LightGray);
 
             if (itemCollected)
             {
                 string hasItem = "Item collected! Return to the start and exit through the portal!";
                 Vector2 hasItemSize = font.MeasureString(hasItem);
-                Vector2 hasItemPos = new Vector2((ScreenWidth - hasItemSize.X) / 2f, 70f);
+                Vector2 hasItemPos = new Vector2((ScreenWidth - hasItemSize.X) / 2f, 10f);
                 spriteBatch.DrawString(font, hasItem, hasItemPos, Color.LightGreen);
             }
         }

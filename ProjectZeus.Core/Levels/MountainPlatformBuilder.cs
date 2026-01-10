@@ -81,11 +81,11 @@ namespace ProjectZeus.Core.Levels
                 currentY -= spacing;
             }
             
-            // Add the final goat platform at the top
+            // Add the final goat platform at the top - increased width for goat and item
             staticPlatforms.Add(new Platform
             {
-                Position = new Vector2(screenSize.X / 2f - 150f, baseY - 2120),
-                Size = new Vector2(300, PlatformHeight),
+                Position = new Vector2(screenSize.X / 2f - 200f, baseY - 2120),
+                Size = new Vector2(400, PlatformHeight),
                 Color = LevelColors[^1]
             });
             
