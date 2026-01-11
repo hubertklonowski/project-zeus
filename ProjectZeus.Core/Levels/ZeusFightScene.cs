@@ -23,6 +23,9 @@ namespace ProjectZeus.Core
         // When true, the calling game code should transition to the mountain level
         // and spawn the player where the goat used to be so they can throw rocks.
         public bool ShouldStartMountainAsGoat { get; private set; }
+        
+        // When true, the calling game code should show the credits screen
+        public bool ShouldShowCredits { get; private set; }
 
         private readonly Vector2 baseScreenSize = new Vector2(800, 480);
         private Texture2D solidTexture;
@@ -62,6 +65,9 @@ namespace ProjectZeus.Core
         private PillarItemType currentPlacedItem = PillarItemType.None;
         private int correctAnswers = 0;
         
+        // Track which items have been used
+        private HashSet<PillarItemType> usedItems = new HashSet<PillarItemType>();
+        
         // Timer state
         private const float timeLimit = 10f;
         private float remainingTime = timeLimit;
@@ -93,6 +99,7 @@ namespace ProjectZeus.Core
         {
             IsCompleted = false;
             ShouldRestartGame = false;
+            ShouldShowCredits = false;
         }
 
         public void LoadContent(GraphicsDevice graphicsDevice, SpriteFont font)
@@ -277,28 +284,14 @@ namespace ProjectZeus.Core
                 
                 if (qKeyPressed)
                 {
-                    // Cycle backwards: Mountain <- Mine <- Maze <- None <- Mountain
-                    if (currentPlacedItem == PillarItemType.None)
-                        currentPlacedItem = PillarItemType.Mountain;
-                    else if (currentPlacedItem == PillarItemType.Mountain)
-                        currentPlacedItem = PillarItemType.Maze;
-                    else if (currentPlacedItem == PillarItemType.Maze)
-                        currentPlacedItem = PillarItemType.Mine;
-                    else if (currentPlacedItem == PillarItemType.Mine)
-                        currentPlacedItem = PillarItemType.None;
+                    // Cycle backwards through available (unused) items only
+                    CyclePreviousItem();
                 }
                 
                 if (eKeyPressed)
                 {
-                    // Cycle forwards: None -> Mountain -> Mine -> Maze -> None
-                    if (currentPlacedItem == PillarItemType.None)
-                        currentPlacedItem = PillarItemType.Mountain;
-                    else if (currentPlacedItem == PillarItemType.Mountain)
-                        currentPlacedItem = PillarItemType.Mine;
-                    else if (currentPlacedItem == PillarItemType.Mine)
-                        currentPlacedItem = PillarItemType.Maze;
-                    else if (currentPlacedItem == PillarItemType.Maze)
-                        currentPlacedItem = PillarItemType.None;
+                    // Cycle forwards through available (unused) items only
+                    CycleNextItem();
                 }
                 
                 // Check if player confirms the item
@@ -323,6 +316,7 @@ namespace ProjectZeus.Core
             {
                 // Correct item!
                 correctAnswers++;
+                usedItems.Add(currentPlacedItem); // Mark item as used
                 currentPlacedItem = PillarItemType.None;
                 
                 if (correctAnswers >= 3)
@@ -330,6 +324,7 @@ namespace ProjectZeus.Core
                     // Victory!
                     victoryAchieved = true;
                     timerActive = false;
+                    ShouldShowCredits = true;
                 }
                 else
                 {
@@ -348,6 +343,86 @@ namespace ProjectZeus.Core
                 stompAnimationTime = 0f;
                 timerActive = false;
             }
+        }
+
+        private void CycleNextItem()
+        {
+            // Start with first item if currently None
+            if (currentPlacedItem == PillarItemType.None)
+            {
+                // Find first unused item in order: Mountain -> Mine -> Maze
+                if (!usedItems.Contains(PillarItemType.Mountain))
+                    currentPlacedItem = PillarItemType.Mountain;
+                else if (!usedItems.Contains(PillarItemType.Mine))
+                    currentPlacedItem = PillarItemType.Mine;
+                else if (!usedItems.Contains(PillarItemType.Maze))
+                    currentPlacedItem = PillarItemType.Maze;
+                // If all used, stay at None
+                return;
+            }
+            
+            // Cycle forward through unused items only, skipping None
+            PillarItemType nextItem = currentPlacedItem;
+            int attempts = 0;
+            
+            do
+            {
+                if (nextItem == PillarItemType.Mountain)
+                    nextItem = PillarItemType.Mine;
+                else if (nextItem == PillarItemType.Mine)
+                    nextItem = PillarItemType.Maze;
+                else if (nextItem == PillarItemType.Maze)
+                    nextItem = PillarItemType.Mountain;
+                    
+                attempts++;
+                
+                // Prevent infinite loop - if we've checked all items, keep current
+                if (attempts > 3)
+                    return;
+            }
+            while (usedItems.Contains(nextItem));
+            
+            currentPlacedItem = nextItem;
+        }
+
+        private void CyclePreviousItem()
+        {
+            // Start with last item if currently None
+            if (currentPlacedItem == PillarItemType.None)
+            {
+                // Find last unused item in reverse order: Maze -> Mine -> Mountain
+                if (!usedItems.Contains(PillarItemType.Maze))
+                    currentPlacedItem = PillarItemType.Maze;
+                else if (!usedItems.Contains(PillarItemType.Mine))
+                    currentPlacedItem = PillarItemType.Mine;
+                else if (!usedItems.Contains(PillarItemType.Mountain))
+                    currentPlacedItem = PillarItemType.Mountain;
+                // If all used, stay at None
+                return;
+            }
+            
+            // Cycle backward through unused items only, skipping None
+            PillarItemType previousItem = currentPlacedItem;
+            int attempts = 0;
+            
+            do
+            {
+                if (previousItem == PillarItemType.Mountain)
+                    previousItem = PillarItemType.Maze;
+                else if (previousItem == PillarItemType.Maze)
+                    previousItem = PillarItemType.Mine;
+                else if (previousItem == PillarItemType.Mine)
+                    previousItem = PillarItemType.Mountain;
+                    
+                attempts++;
+                
+                // Prevent infinite loop - if we've checked all items, keep current
+                if (attempts > 3)
+                    return;
+            }
+            while (usedItems.Contains(previousItem));
+            
+            currentPlacedItem = previousItem;
         }
 
         public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, AdonisPlayer player, GameTime gameTime, bool playerIsGoat)

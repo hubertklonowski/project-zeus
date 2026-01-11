@@ -65,6 +65,10 @@ namespace ProjectZeus.Core
         private float playerRockThrowCooldown = 0f;
         private const float PlayerRockThrowDelay = 0.5f; // Half second delay between throws
         
+        // Goat timer - after 1 minute as goat, show credits
+        private float goatTimer = 0f;
+        private const float GoatCreditsTime = 60f; // 1 minute
+        
         // Collectible item at mountain top
         private Vector2 itemPosition;
         private readonly Vector2 itemSize = new Vector2(30, 30);
@@ -75,6 +79,11 @@ namespace ProjectZeus.Core
         /// mountain and can throw rocks downward using input instead of the AI goat.
         /// </summary>
         public bool PlayerIsGoat { get; set; }
+        
+        /// <summary>
+        /// When true, 1 minute has passed since player became a goat, should show credits
+        /// </summary>
+        public bool ShouldShowCredits { get; private set; }
         
         public bool PlayerDied { get; private set; }
         public bool ItemWasCollected { get; private set; }
@@ -97,6 +106,7 @@ namespace ProjectZeus.Core
             itemCollected = false;
             PlayerDied = false;
             ItemWasCollected = false;
+            ShouldShowCredits = false;
             cameraOffset = Vector2.Zero;
         }
         
@@ -201,6 +211,16 @@ namespace ProjectZeus.Core
             
             // Update camera to follow player
             UpdateCamera(playerPosition);
+            
+            // Update goat timer if player is the goat
+            if (PlayerIsGoat)
+            {
+                goatTimer += dt;
+                if (goatTimer >= GoatCreditsTime)
+                {
+                    ShouldShowCredits = true;
+                }
+            }
             
             // Update moving platforms
             foreach (var movingPlatform in movingPlatforms)
@@ -310,6 +330,19 @@ namespace ProjectZeus.Core
                 {
                     itemCollected = true;
                     ItemWasCollected = true;
+                }
+            }
+            
+            // Update goat timer - only while player is the goat
+            if (PlayerIsGoat)
+            {
+                goatTimer += dt;
+                
+                // After 1 minute as goat, show credits (triggered once)
+                if (goatTimer >= GoatCreditsTime)
+                {
+                    ShouldShowCredits = true;
+                    goatTimer = 0f; // Reset timer after showing credits
                 }
             }
         }
@@ -589,6 +622,8 @@ namespace ProjectZeus.Core
             PlayerDied = false;
             goatThrowTimer = GoatThrowInterval;
             playerRockThrowCooldown = 0f;
+            goatTimer = 0f;
+            ShouldShowCredits = false;
             
             // Reset goat position and velocity
             if (topPlatformBounds.Width > 0)

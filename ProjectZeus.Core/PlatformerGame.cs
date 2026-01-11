@@ -99,7 +99,10 @@ namespace ProjectZeus.Core
             var zeusFightScene = new ZeusFightScene();
             zeusFightScene.LoadContent(GraphicsDevice, hudFont);
 
-            sceneManager = new SceneManager(player, pillarRoom, mineLevel, mazeLevel, mountainLevel, zeusFightScene);
+            var creditsScene = new CreditsScene();
+            creditsScene.LoadContent(GraphicsDevice, hudFont);
+
+            sceneManager = new SceneManager(player, pillarRoom, mineLevel, mazeLevel, mountainLevel, zeusFightScene, creditsScene);
 
             ResetPlayerToPillarRoom();
             
@@ -183,6 +186,15 @@ namespace ProjectZeus.Core
 
                 case SceneManager.GameScene.PillarRoom:
                     UpdatePillarRoom(gameTime);
+                    break;
+                
+                case SceneManager.GameScene.Credits:
+                    sceneManager.CreditsScene.Update(gameTime, keyboardState);
+                    if (sceneManager.CreditsScene.IsComplete)
+                    {
+                        // After credits, return to pillar room and reset everything
+                        RespawnAfterDeath();
+                    }
                     break;
             }
 
@@ -535,6 +547,10 @@ namespace ProjectZeus.Core
                     sceneManager.PillarRoom.DrawUI(spriteBatch, playerTexture, hasAnyItem);
                     
                     spriteBatch.End();
+                    break;
+                
+                case SceneManager.GameScene.Credits:
+                    sceneManager.CreditsScene.Draw(spriteBatch, GraphicsDevice);
                     break;
             }
 

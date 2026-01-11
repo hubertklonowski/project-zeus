@@ -17,7 +17,8 @@ namespace ProjectZeus.Core.Game
             MineLevel,
             MazeLevel,
             MountainLevel,
-            ZeusFight
+            ZeusFight,
+            Credits
         }
 
         private AdonisPlayer player;
@@ -26,6 +27,7 @@ namespace ProjectZeus.Core.Game
         private MazeLevel mazeLevel;
         private MountainLevel mountainLevel;
         private ZeusFightScene zeusFightScene;
+        private CreditsScene creditsScene;
 
         // When true, the player is acting as the goat at the top of the mountain
         // and should be able to throw rocks like the original goat.
@@ -43,9 +45,10 @@ namespace ProjectZeus.Core.Game
         public MazeLevel MazeLevel => mazeLevel;
         public MountainLevel MountainLevel => mountainLevel;
         public ZeusFightScene ZeusFightScene => zeusFightScene;
+        public CreditsScene CreditsScene => creditsScene;
 
         public SceneManager(AdonisPlayer player, PillarRoom pillarRoom, MineLevel mineLevel, 
-            MazeLevel mazeLevel, MountainLevel mountainLevel, ZeusFightScene zeusFightScene)
+            MazeLevel mazeLevel, MountainLevel mountainLevel, ZeusFightScene zeusFightScene, CreditsScene creditsScene)
         {
             this.player = player;
             this.pillarRoom = pillarRoom;
@@ -53,6 +56,7 @@ namespace ProjectZeus.Core.Game
             this.mazeLevel = mazeLevel;
             this.mountainLevel = mountainLevel;
             this.zeusFightScene = zeusFightScene;
+            this.creditsScene = creditsScene;
         }
 
         public void TransitionToScene(GameScene scene)
@@ -106,6 +110,12 @@ namespace ProjectZeus.Core.Game
                 resetPlayerAction?.Invoke();
                 IsPlayerGoatOnMountain = false;
             }
+            else if (mountainLevel.ShouldShowCredits)
+            {
+                // Show credits after 1 minute as goat
+                CurrentScene = GameScene.Credits;
+                creditsScene?.Reset();
+            }
         }
 
         public void ReplaceMazeLevel(MazeLevel newMazeLevel)
@@ -124,24 +134,36 @@ namespace ProjectZeus.Core.Game
         /// </summary>
         public void HandleZeusFightCompletion(System.Action<Vector2> setPlayerPosition)
         {
-            if (zeusFightScene == null || !zeusFightScene.ShouldStartMountainAsGoat)
+            if (zeusFightScene == null)
                 return;
-
-            // Switch to the mountain level.
-            CurrentScene = GameScene.MountainLevel;
-            IsPlayerGoatOnMountain = true;
-
-            Vector2 playerSize = player?.Size ?? new Vector2(32, 48);
-            Vector2 spawnPos = Vector2.Zero;
-
-            if (mountainLevel != null)
+            
+            // Check if we should show credits (victory)
+            if (zeusFightScene.ShouldShowCredits)
             {
-                // Place player where the original goat was standing on the top platform.
-                spawnPos = mountainLevel.GetGoatSpawnPosition(playerSize);
-                mountainLevel.PlayerIsGoat = true;
+                CurrentScene = GameScene.Credits;
+                creditsScene?.Reset();
+                return;
             }
+            
+            // Check if we should transition to mountain as goat
+            if (zeusFightScene.ShouldStartMountainAsGoat)
+            {
+                // Switch to the mountain level.
+                CurrentScene = GameScene.MountainLevel;
+                IsPlayerGoatOnMountain = true;
 
-            setPlayerPosition?.Invoke(spawnPos);
+                Vector2 playerSize = player?.Size ?? new Vector2(32, 48);
+                Vector2 spawnPos = Vector2.Zero;
+
+                if (mountainLevel != null)
+                {
+                    // Place player where the original goat was standing on the top platform.
+                    spawnPos = mountainLevel.GetGoatSpawnPosition(playerSize);
+                    mountainLevel.PlayerIsGoat = true;
+                }
+
+                setPlayerPosition?.Invoke(spawnPos);
+            }
         }
     }
 }
