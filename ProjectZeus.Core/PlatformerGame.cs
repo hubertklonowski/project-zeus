@@ -375,25 +375,22 @@ namespace ProjectZeus.Core
             player.Velocity = newVelocity;
             player.IsOnGround = newIsOnGround;
 
-            // Apply position updates (don't move if transformed to goat)
-            if (!transformedToGoat)
+            // Apply position updates (allow movement even as goat)
+            player.Position += player.Velocity * dt;
+
+            // Ground collision
+            player.IsOnGround = false;
+            if (player.Position.Y + playerSize.Y >= groundTop)
             {
-                player.Position += player.Velocity * dt;
-
-                // Ground collision
-                player.IsOnGround = false;
-                if (player.Position.Y + playerSize.Y >= groundTop)
-                {
-                    player.Position = new Vector2(player.Position.X, groundTop - playerSize.Y);
-                    player.Velocity = new Vector2(player.Velocity.X, 0f);
-                    player.IsOnGround = true;
-                }
-
-                // Clamp player to screen bounds
-                Vector2 tempPos = player.Position;
-                Physics.PlatformerPhysics.ClampToScreen(ref tempPos, playerSize);
-                player.Position = tempPos;
+                player.Position = new Vector2(player.Position.X, groundTop - playerSize.Y);
+                player.Velocity = new Vector2(player.Velocity.X, 0f);
+                player.IsOnGround = true;
             }
+
+            // Clamp player to screen bounds
+            Vector2 tempPos = player.Position;
+            Physics.PlatformerPhysics.ClampToScreen(ref tempPos, playerSize);
+            player.Position = tempPos;
             
             player.Update(gameTime);
 

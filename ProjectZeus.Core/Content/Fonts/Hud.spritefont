@@ -55,6 +55,11 @@ with.
         <Start>&#32;</Start>
         <End>&#126;</End>
       </CharacterRegion>
+      <!-- Greek characters -->
+      <CharacterRegion>
+        <Start>&#0370;</Start>
+        <End>&#03FF;</End>
+      </CharacterRegion>
     </CharacterRegions>
   </Asset>
 </XnaContent>

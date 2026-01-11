@@ -25,6 +25,9 @@ namespace ProjectZeus.Core
         private SpriteFont titleFont;
         private AsepriteSprite zeusSprite;
         private AsepriteSprite goatSprite;
+        private AsepriteSprite grapesSprite;
+        private AsepriteSprite mineItemSprite;
+        private AsepriteSprite mountainItemSprite;
         
         private Vector2 zeusPosition;
         private Vector2 sacrificePillarPosition;
@@ -59,11 +62,10 @@ namespace ProjectZeus.Core
         private float remainingTime = timeLimit;
         private bool timerActive = false;
         
-        // Zeus animation state
-        private bool zeusAngry = false;
-        private float angryAnimationTime = 0f;
-        private const float laughDuration = 3f;
-        private string zeusLaughText = "Χα χα χα!"; // "Ha ha ha!" in Greek
+        // Zeus stomp animation state
+        private bool zeusStomp = false;
+        private float stompAnimationTime = 0f;
+        private const float stompDuration = 2f;
         
         // Player transformation state
         private bool playerTransformedToGoat = false;
@@ -92,6 +94,11 @@ namespace ProjectZeus.Core
             
             // Load goat sprite for transformation
             goatSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Goat);
+            
+            // Load item sprites
+            grapesSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Grapes);
+            mineItemSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Cart); // Using cart as mine item
+            mountainItemSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Goat); // Using goat as mountain item placeholder
             
             // Position Zeus on the left side of the screen, standing on ground
             float groundTop = baseScreenSize.Y * 0.7f; // This is where ground starts (y = 336)
@@ -138,33 +145,30 @@ namespace ProjectZeus.Core
                 return (playerVelocity, playerIsOnGround, playerTransformedToGoat);
             }
             
-            if (zeusAngry)
+            // Handle Zeus stomping after goat transformation
+            if (zeusStomp)
             {
-                angryAnimationTime += (float)gameTime.ElapsedGameTime.TotalSeconds;
-                if (angryAnimationTime >= laughDuration)
-                {
-                    ShouldRestartGame = true;
-                }
-                return (Vector2.Zero, playerIsOnGround, playerTransformedToGoat);
+                stompAnimationTime += (float)gameTime.ElapsedGameTime.TotalSeconds;
+                // Don't restart game, just continue
+                // Player can still move as goat
             }
             
-            // Update timer
-            if (timerActive)
+            // Update timer only if not transformed to goat
+            if (timerActive && !playerTransformedToGoat)
             {
                 remainingTime -= (float)gameTime.ElapsedGameTime.TotalSeconds;
                 if (remainingTime <= 0)
                 {
-                    // Time's up! Wrong answer
-                    zeusAngry = true;
+                    // Time's up! Wrong answer - transform to goat and Zeus stomps
+                    zeusStomp = true;
                     playerTransformedToGoat = true;
                     PlayerTransformedToGoat = true;
-                    angryAnimationTime = 0f;
+                    stompAnimationTime = 0f;
                     timerActive = false;
-                    return (Vector2.Zero, playerIsOnGround, playerTransformedToGoat);
                 }
             }
             
-            // Apply physics to player
+            // Apply physics to player (even as goat)
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             float groundTop = baseScreenSize.Y * 0.7f;
             
@@ -184,42 +188,45 @@ namespace ProjectZeus.Core
 
             playerVelocity = new Vector2(playerVelocity.X, playerVelocity.Y + 900f * dt);
             
-            // Handle item selection with Q/E keys (Q = previous, E = next)
-            bool qKeyPressed = keyboardState.IsKeyDown(Keys.Q) && !previousKeyState.IsKeyDown(Keys.Q);
-            bool eKeyPressed = keyboardState.IsKeyDown(Keys.E) && !previousKeyState.IsKeyDown(Keys.E);
-            
-            if (qKeyPressed)
+            // Handle item selection with Q/E keys only if not transformed to goat
+            if (!playerTransformedToGoat)
             {
-                // Cycle backwards: Mountain <- Mine <- Maze <- None <- Mountain
-                if (currentPlacedItem == PillarItemType.None)
-                    currentPlacedItem = PillarItemType.Mountain;
-                else if (currentPlacedItem == PillarItemType.Mountain)
-                    currentPlacedItem = PillarItemType.Maze;
-                else if (currentPlacedItem == PillarItemType.Maze)
-                    currentPlacedItem = PillarItemType.Mine;
-                else if (currentPlacedItem == PillarItemType.Mine)
-                    currentPlacedItem = PillarItemType.None;
-            }
-            
-            if (eKeyPressed)
-            {
-                // Cycle forwards: None -> Mountain -> Mine -> Maze -> None
-                if (currentPlacedItem == PillarItemType.None)
-                    currentPlacedItem = PillarItemType.Mountain;
-                else if (currentPlacedItem == PillarItemType.Mountain)
-                    currentPlacedItem = PillarItemType.Mine;
-                else if (currentPlacedItem == PillarItemType.Mine)
-                    currentPlacedItem = PillarItemType.Maze;
-                else if (currentPlacedItem == PillarItemType.Maze)
-                    currentPlacedItem = PillarItemType.None;
-            }
-            
-            // Check if player confirms the item
-            bool confirmPressed = keyboardState.IsKeyDown(Keys.Enter) && !previousKeyState.IsKeyDown(Keys.Enter);
-            
-            if (confirmPressed && currentPlacedItem != PillarItemType.None)
-            {
-                ValidateSacrifice();
+                bool qKeyPressed = keyboardState.IsKeyDown(Keys.Q) && !previousKeyState.IsKeyDown(Keys.Q);
+                bool eKeyPressed = keyboardState.IsKeyDown(Keys.E) && !previousKeyState.IsKeyDown(Keys.E);
+                
+                if (qKeyPressed)
+                {
+                    // Cycle backwards: Mountain <- Mine <- Maze <- None <- Mountain
+                    if (currentPlacedItem == PillarItemType.None)
+                        currentPlacedItem = PillarItemType.Mountain;
+                    else if (currentPlacedItem == PillarItemType.Mountain)
+                        currentPlacedItem = PillarItemType.Maze;
+                    else if (currentPlacedItem == PillarItemType.Maze)
+                        currentPlacedItem = PillarItemType.Mine;
+                    else if (currentPlacedItem == PillarItemType.Mine)
+                        currentPlacedItem = PillarItemType.None;
+                }
+                
+                if (eKeyPressed)
+                {
+                    // Cycle forwards: None -> Mountain -> Mine -> Maze -> None
+                    if (currentPlacedItem == PillarItemType.None)
+                        currentPlacedItem = PillarItemType.Mountain;
+                    else if (currentPlacedItem == PillarItemType.Mountain)
+                        currentPlacedItem = PillarItemType.Mine;
+                    else if (currentPlacedItem == PillarItemType.Mine)
+                        currentPlacedItem = PillarItemType.Maze;
+                    else if (currentPlacedItem == PillarItemType.Maze)
+                        currentPlacedItem = PillarItemType.None;
+                }
+                
+                // Check if player confirms the item
+                bool confirmPressed = keyboardState.IsKeyDown(Keys.Enter) && !previousKeyState.IsKeyDown(Keys.Enter);
+                
+                if (confirmPressed && currentPlacedItem != PillarItemType.None)
+                {
+                    ValidateSacrifice();
+                }
             }
             
             previousKeyState = keyboardState;
@@ -253,11 +260,11 @@ namespace ProjectZeus.Core
             }
             else
             {
-                // Wrong item - Zeus gets angry and laughs
-                zeusAngry = true;
+                // Wrong item - transform to goat and Zeus stomps
+                zeusStomp = true;
                 playerTransformedToGoat = true;
                 PlayerTransformedToGoat = true;
-                angryAnimationTime = 0f;
+                stompAnimationTime = 0f;
                 timerActive = false;
             }
         }
@@ -283,19 +290,15 @@ namespace ProjectZeus.Core
             // Draw Zeus using zus.aseprite sprite
             if (zeusSprite != null && zeusSprite.IsLoaded)
             {
-                // Zeus is moving/animated when angry (laughing)
-                bool isMoving = zeusAngry;
+                // Zeus is moving/animated when stomping
+                bool isMoving = zeusStomp;
                 zeusSprite.Draw(spriteBatch, zeusPosition, isMoving, gameTime, Color.White, 10f, SpriteEffects.None);
             }
             
-            // Draw Zeus dialogue bubble or laugh
-            if (!victoryAchieved)
+            // Draw Zeus dialogue bubble (only show if not stomping and not transformed)
+            if (!victoryAchieved && !zeusStomp && !playerTransformedToGoat)
             {
-                if (zeusAngry)
-                {
-                    DrawDialogueBubble(spriteBatch, zeusLaughText);
-                }
-                else if (currentDialogueIndex < dialogueMappings.Length)
+                if (currentDialogueIndex < dialogueMappings.Length)
                 {
                     DrawDialogueBubble(spriteBatch, dialogueMappings[currentDialogueIndex].Dialogue);
                 }
@@ -349,12 +352,42 @@ namespace ProjectZeus.Core
             // Draw current item if selected (always visible on altar)
             if (currentPlacedItem != PillarItemType.None)
             {
-                Color itemColor = currentPlacedItem == PillarItemType.Mountain ? Color.Gold :
-                                  currentPlacedItem == PillarItemType.Mine ? Color.DeepSkyBlue :
-                                  Color.MediumVioletRed;
-                Rectangle itemRect = slotRect;
-                itemRect.Inflate(-5, -5);
-                spriteBatch.Draw(solidTexture, itemRect, itemColor);
+                Vector2 slotCenter = new Vector2(slotRect.Center.X, slotRect.Center.Y);
+                
+                // Draw actual item sprites instead of colored rectangles
+                if (currentPlacedItem == PillarItemType.Maze && grapesSprite != null && grapesSprite.IsLoaded)
+                {
+                    // Draw grapes sprite
+                    Vector2 drawPos = new Vector2(
+                        slotCenter.X - grapesSprite.Size.X / 2f,
+                        slotCenter.Y - grapesSprite.Size.Y / 2f);
+                    grapesSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime, Color.White);
+                }
+                else if (currentPlacedItem == PillarItemType.Mine && mineItemSprite != null && mineItemSprite.IsLoaded)
+                {
+                    // Draw mine item sprite (cart)
+                    Vector2 drawPos = new Vector2(
+                        slotCenter.X - mineItemSprite.Size.X / 2f,
+                        slotCenter.Y - mineItemSprite.Size.Y / 2f);
+                    mineItemSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime, Color.White);
+                }
+                else if (currentPlacedItem == PillarItemType.Mountain)
+                {
+                    // Draw gold colored rectangle for mountain item
+                    Rectangle itemRect = slotRect;
+                    itemRect.Inflate(-5, -5);
+                    spriteBatch.Draw(solidTexture, itemRect, Color.Gold);
+                }
+                else
+                {
+                    // Fallback to colored rectangles
+                    Color itemColor = currentPlacedItem == PillarItemType.Mountain ? Color.Gold :
+                                      currentPlacedItem == PillarItemType.Mine ? Color.DeepSkyBlue :
+                                      Color.MediumVioletRed;
+                    Rectangle itemRect = slotRect;
+                    itemRect.Inflate(-5, -5);
+                    spriteBatch.Draw(solidTexture, itemRect, itemColor);
+                }
             }
         }
         
@@ -394,7 +427,15 @@ namespace ProjectZeus.Core
                 Vector2 textPos = new Vector2((baseScreenSize.X - textSize.X) / 2f, baseScreenSize.Y / 2f - textSize.Y / 2f);
                 spriteBatch.DrawString(titleFont, victoryText, textPos, Color.Gold);
             }
-            else if (!zeusAngry)
+            else if (playerTransformedToGoat)
+            {
+                // Show goat message
+                string goatText = "You are now a goat! Move around freely.";
+                Vector2 textSize = titleFont.MeasureString(goatText);
+                Vector2 textPos = new Vector2((baseScreenSize.X - textSize.X) / 2f, 20);
+                spriteBatch.DrawString(titleFont, goatText, textPos, Color.LightGreen);
+            }
+            else if (!zeusStomp)
             {
                 string instruction = "Use Q/E keys to select item, ENTER to confirm";
                 Vector2 textSize = titleFont.MeasureString(instruction);
