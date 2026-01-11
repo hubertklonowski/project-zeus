@@ -62,11 +62,15 @@ namespace ProjectZeus.Core.Levels.Mine
             const float maxCartSpacing = 500f;
             float nextCartX = 500f;
             
+            // Calculate cart height to position it properly on the ground
+            float cartHeight = cartSprite?.IsLoaded == true ? cartSprite.Size.Y : 30f;
+            float cartY = groundTop - cartHeight / 2f; // Position center of cart above ground
+            
             while (nextCartX < worldWidth - 200)
             {
                 carts.Add(new MineCart
                 {
-                    Position = new Vector2(nextCartX, groundTop - 20),
+                    Position = new Vector2(nextCartX, cartY),
                     Velocity = new Vector2(-cartSpeed, 0),
                     MinX = 0,
                     MaxX = worldWidth,

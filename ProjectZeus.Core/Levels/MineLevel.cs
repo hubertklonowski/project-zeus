@@ -214,9 +214,13 @@ namespace ProjectZeus.Core.Levels
             // Only spawn if not too far into the level (player is returning)
             if (spawnX < WorldWidth)
             {
+                // Calculate cart height to position it properly on the ground
+                float cartHeight = cartSprite?.IsLoaded == true ? cartSprite.Size.Y : 30f;
+                float cartY = groundTop - cartHeight / 2f; // Position center of cart above ground
+                
                 carts.Add(new MineCart
                 {
-                    Position = new Vector2(spawnX, groundTop - 20),
+                    Position = new Vector2(spawnX, cartY),
                     Velocity = new Vector2(-CartSpeed, 0), // Moving left toward player
                     MinX = 0,
                     MaxX = WorldWidth,

@@ -25,7 +25,7 @@ namespace ProjectZeus.Core.Levels.Mine
             // Check collision with stalactites
             foreach (var stalactite in stalactites)
             {
-                if (playerRect.IntersectsWith(stalactite.Position, stalactite.Size))
+                if (playerRect.IntersectsWith(stalactite.Bounds))
                 {
                     return true;
                 }

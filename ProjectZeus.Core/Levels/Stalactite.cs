@@ -13,6 +13,16 @@ namespace ProjectZeus.Core.Levels
         public Vector2 Size { get; set; }
         public AsepriteSprite Sprite { get; set; }
         
+        public Rectangle Bounds
+        {
+            get
+            {
+                if (Sprite != null && Sprite.IsLoaded)
+                    return new Rectangle((int)Position.X, (int)Position.Y, (int)Sprite.Size.X, (int)Sprite.Size.Y);
+                return new Rectangle((int)Position.X, (int)Position.Y, (int)Size.X, (int)Size.Y);
+            }
+        }
+        
         public void Draw(SpriteBatch spriteBatch, GameTime gameTime)
         {
             if (Sprite != null && Sprite.IsLoaded)
