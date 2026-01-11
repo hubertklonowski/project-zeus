@@ -7,6 +7,15 @@ using ProjectZeus.Core.Rendering;
 namespace ProjectZeus.Core.Levels.Mine
 {
     /// <summary>
+    /// Represents a single floor tile in the mine
+    /// </summary>
+    public struct FloorTile
+    {
+        public Vector2 Position { get; set; }
+        public int SpriteIndex { get; set; }
+    }
+
+    /// <summary>
     /// Handles rendering for the mine level
     /// </summary>
     public class MineRenderer
@@ -30,6 +39,37 @@ namespace ProjectZeus.Core.Levels.Mine
                 int patchY = 100 + (x / 200 % 3) * 80;
                 Rectangle patch = new Rectangle(x, patchY, 150, 100);
                 spriteBatch.Draw(solidTexture, patch, new Color(15, 10, 25));
+            }
+        }
+
+        public void DrawFloor(SpriteBatch spriteBatch, List<FloorTile> floorTiles, AsepriteSprite[] floorSprites, 
+            float cameraOffsetX, float screenWidth, Rectangle groundRect)
+        {
+            // Draw floor tiles if sprites are loaded
+            if (floorSprites != null && floorSprites.Length > 0 && floorTiles != null)
+            {
+                foreach (var tile in floorTiles)
+                {
+                    // Only draw tiles visible on screen
+                    if (tile.Position.X >= cameraOffsetX - 100 && 
+                        tile.Position.X <= cameraOffsetX + screenWidth + 100)
+                    {
+                        var sprite = floorSprites[tile.SpriteIndex];
+                        if (sprite != null && sprite.IsLoaded)
+                        {
+                            var texture = sprite.GetFrameTexture(0);
+                            if (texture != null)
+                            {
+                                Rectangle destRect = new Rectangle(
+                                    (int)tile.Position.X, 
+                                    (int)tile.Position.Y, 
+                                    (int)sprite.Size.X, 
+                                    (int)sprite.Size.Y);
+                                spriteBatch.Draw(texture, destRect, Color.White);
+                            }
+                        }
+                    }
+                }
             }
         }
 

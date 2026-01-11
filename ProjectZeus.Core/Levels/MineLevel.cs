@@ -20,7 +20,7 @@ namespace ProjectZeus.Core.Levels
     {
         // World dimensions - level spans multiple screens horizontally
         private const float WorldWidth = 4000f;
-        private const float GroundHeight = 20f;
+        private const float GroundHeight = 60f;
         private const float ScreenWidth = 800f;
         private const float ScreenHeight = 480f;
         
@@ -41,6 +41,7 @@ namespace ProjectZeus.Core.Levels
         
         // Ground
         private Rectangle groundRect;
+        private List<FloorTile> floorTiles;
         
         // Obstacles
         private List<MineCart> carts;
@@ -64,6 +65,7 @@ namespace ProjectZeus.Core.Levels
         private AsepriteSprite cartSprite;
         private AsepriteSprite stalactiteSprite;
         private AsepriteSprite batSprite;
+        private AsepriteSprite[] floorSprites;
         
         // Helpers
         private Random random;
@@ -89,6 +91,7 @@ namespace ProjectZeus.Core.Levels
             stalactites = new List<Stalactite>();
             bats = new List<MineBat>();
             guanos = new List<Guano>();
+            floorTiles = new List<FloorTile>();
             random = new Random();
             IsActive = false;
             camera = new CameraController(ScreenWidth, ScreenHeight, WorldWidth, ScreenHeight);
@@ -107,6 +110,12 @@ namespace ProjectZeus.Core.Levels
             cartSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Cart);
             stalactiteSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Stalactite);
             batSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Bat);
+            
+            // Load floor sprites
+            floorSprites = new AsepriteSprite[3];
+            floorSprites[0] = AsepriteSprite.Load(graphicsDevice, AssetPaths.MineFloor1);
+            floorSprites[1] = AsepriteSprite.Load(graphicsDevice, AssetPaths.MineFloor2);
+            floorSprites[2] = AsepriteSprite.Load(graphicsDevice, AssetPaths.MineFloor3);
         }
 
         public void Enter()
@@ -117,8 +126,20 @@ namespace ProjectZeus.Core.Levels
             PlayerDied = false;
             cartSpawnTimer = CartSpawnInterval;
             
-            // Player starts on the left side of the level
-            float groundTop = ScreenHeight - GroundHeight;
+            // Determine tile height for proper ground positioning using actual loaded sprite
+            float tileHeight = 32f; // default fallback
+            if (floorSprites != null && floorSprites.Length > 0 && floorSprites[0] != null && floorSprites[0].IsLoaded)
+            {
+                tileHeight = floorSprites[0].Size.Y;
+            }
+            
+            // Ground top is now at the top of the floor tiles
+            float groundTop = ScreenHeight - tileHeight;
+            
+            // Set the ground top for player controller
+            playerController.SetGroundTop(groundTop);
+            
+            // Player starts on the left side of the level, standing on the new ground level
             playerPosition = new Vector2(100f, groundTop - GameConstants.PlayerSize.Y);
             playerVelocity = Vector2.Zero;
             playerOnGround = true;
@@ -126,10 +147,14 @@ namespace ProjectZeus.Core.Levels
             // Initialize camera at start
             camera.Reset();
             
-            // Setup ground
-            groundRect = new Rectangle(0, (int)(ScreenHeight - GroundHeight), (int)WorldWidth, (int)GroundHeight);
+            // Setup ground rect (using actual tile height for physics)
+            groundRect = new Rectangle(0, (int)groundTop, (int)WorldWidth, (int)tileHeight);
             
-            // Generate obstacles using generator
+            // Generate random floor tiles
+            GenerateFloorTiles(groundTop);
+            
+            // Generate obstacles using the actual ground top position
+            obstacleGenerator = new MineObstacleGenerator(WorldWidth, ScreenHeight, tileHeight, CartSpeed, random);
             obstacleGenerator.GenerateObstacles(carts, stalactites, bats, out gigaBat, 
                 cartSprite, stalactiteSprite, batSprite);
             
@@ -145,6 +170,36 @@ namespace ProjectZeus.Core.Levels
                 new Vector2(60f, 80f),
                 new Color(100, 200, 255));
             exitPortal.IsActive = false; // Only active after collecting item
+        }
+        
+        private void GenerateFloorTiles(float groundTop)
+        {
+            floorTiles.Clear();
+            
+            // Determine tile size from the first loaded sprite, or use default
+            float tileWidth = 32f;
+            float tileHeight = 32f;
+            
+            if (floorSprites != null && floorSprites.Length > 0 && floorSprites[0] != null && floorSprites[0].IsLoaded)
+            {
+                tileWidth = floorSprites[0].Size.X;
+                tileHeight = floorSprites[0].Size.Y;
+            }
+            
+            // Position tiles at the bottom of the screen so they fill from bottom up
+            // This ensures no gap between tiles and screen bottom
+            float tileY = ScreenHeight - tileHeight;
+            
+            // Generate tiles across the entire world width
+            for (float x = 0; x < WorldWidth; x += tileWidth)
+            {
+                int spriteIndex = random.Next(0, 3); // Randomly choose from 3 floor sprites
+                floorTiles.Add(new FloorTile
+                {
+                    Position = new Vector2(x, tileY),
+                    SpriteIndex = spriteIndex
+                });
+            }
         }
 
         public void Update(GameTime gameTime, KeyboardState keyboardState, KeyboardState previousKeyboardState)
@@ -206,7 +261,15 @@ namespace ProjectZeus.Core.Levels
         
         private void SpawnReturnCart()
         {
-            float groundTop = ScreenHeight - GroundHeight;
+            // Determine tile height for proper ground positioning - same as in Enter()
+            float tileHeight = 32f; // default
+            if (floorSprites != null && floorSprites.Length > 0 && floorSprites[0] != null && floorSprites[0].IsLoaded)
+            {
+                tileHeight = floorSprites[0].Size.Y;
+            }
+            
+            // Ground top is at the top of the floor tiles
+            float groundTop = ScreenHeight - tileHeight;
             
             // Spawn cart just off the right side of the visible screen
             float spawnX = camera.CameraOffset.X + ScreenWidth + 50f;
@@ -247,12 +310,11 @@ namespace ProjectZeus.Core.Levels
             
             renderer.DrawVisibleEntities(spriteBatch, gameTime, cameraOffsetX, stalactites, carts, bats, gigaBat, guanos);
             
-            spriteBatch.Draw(solidTexture, groundRect, new Color(80, 70, 60));
-            renderer.DrawRails(spriteBatch, ScreenHeight - GroundHeight, WorldWidth, cameraOffsetX, ScreenWidth);
+            // Draw floor with random tiles
+            renderer.DrawFloor(spriteBatch, floorTiles, floorSprites, cameraOffsetX, ScreenWidth, groundRect);
             renderer.DrawCollectibles(spriteBatch, gameTime, portalTexture, cameraOffsetX, itemRect, itemCollected, exitPortal);
             
             player.Draw(gameTime, spriteBatch);
-            renderer.DrawTorches(spriteBatch, gameTime, ScreenHeight - GroundHeight, WorldWidth, cameraOffsetX, ScreenWidth);
         }
         
         /// <summary>
@@ -284,6 +346,7 @@ namespace ProjectZeus.Core.Levels
             stalactites.Clear();
             bats.Clear();
             guanos.Clear();
+            floorTiles.Clear();
             gigaBat = null;
             exitPortal = null;
             camera.Reset();

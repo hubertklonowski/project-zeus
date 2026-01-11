@@ -11,12 +11,18 @@ namespace ProjectZeus.Core.Levels.Mine
     public class MinePlayerController
     {
         private const float ScreenHeight = 480f;
-        private const float GroundHeight = 20f;
         private readonly float worldWidth;
+        private float groundTop;
 
         public MinePlayerController(float worldWidth)
         {
             this.worldWidth = worldWidth;
+            this.groundTop = ScreenHeight - 20f; // default fallback
+        }
+
+        public void SetGroundTop(float groundTop)
+        {
+            this.groundTop = groundTop;
         }
 
         public void UpdatePlayer(KeyboardState keyboardState, ref Vector2 playerPosition, ref Vector2 playerVelocity, 
@@ -45,8 +51,7 @@ namespace ProjectZeus.Core.Levels.Mine
             if (playerPosition.X + GameConstants.PlayerSize.X > worldWidth)
                 playerPosition.X = worldWidth - GameConstants.PlayerSize.X;
 
-            // Ground collision
-            float groundTop = ScreenHeight - GroundHeight;
+            // Ground collision using actual ground top
             playerOnGround = false;
             
             if (playerPosition.Y + GameConstants.PlayerSize.Y >= groundTop)
