@@ -5,6 +5,7 @@ namespace ProjectZeus.Core.Levels.ZeusFight
 {
     public class ZeusItemManager
     {
+        private const int MaxItemAttempts = 3;
         private PillarItemType currentPlacedItem = PillarItemType.None;
         private readonly HashSet<PillarItemType> usedItems = new HashSet<PillarItemType>();
 
@@ -46,7 +47,7 @@ namespace ProjectZeus.Core.Levels.ZeusFight
                     nextItem = PillarItemType.Mountain;
 
                 attempts++;
-                if (attempts > 3) return;
+                if (attempts > MaxItemAttempts) return;
             }
             while (usedItems.Contains(nextItem));
 
@@ -79,7 +80,7 @@ namespace ProjectZeus.Core.Levels.ZeusFight
                     previousItem = PillarItemType.Mountain;
 
                 attempts++;
-                if (attempts > 3) return;
+                if (attempts > MaxItemAttempts) return;
             }
             while (usedItems.Contains(previousItem));
 

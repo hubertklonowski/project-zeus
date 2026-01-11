@@ -49,7 +49,7 @@ namespace ProjectZeus.Core.Levels.ZeusFight
                 if (currentPlacedItem == PillarItemType.Maze && grapesSprite != null && grapesSprite.IsLoaded)
                 {
                     Vector2 drawPos = new Vector2(slotCenter.X - grapesSprite.Size.X / 2f, slotCenter.Y - grapesSprite.Size.Y / 2f);
-                    grapesSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime, Color.White);
+                    grapesSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime, Color.White, 1f, SpriteEffects.None);
                 }
                 else
                 {
