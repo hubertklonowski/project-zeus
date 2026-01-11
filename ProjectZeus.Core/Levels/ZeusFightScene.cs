@@ -128,6 +128,14 @@ namespace ProjectZeus.Core
  
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             float groundTop = baseScreenSize.Y * 0.7f;
+            Vector2 zeusSize = zeusSprite?.IsLoaded == true ? zeusSprite.Size : new Vector2(80, 120);
+            
+            // Ensure Zeus stays on the ground when not jumping
+            if (!zeusIsJumping)
+            {
+                zeusPosition.Y = groundTop - zeusSize.Y;
+                zeusVelocity = Vector2.Zero;
+            }
              
             // Handle Zeus stomping after goat transformation
             if (zeusStomp)
@@ -143,7 +151,7 @@ namespace ProjectZeus.Core
                 if (zeusIsJumping)
                 {
                     physicsController.UpdateZeusJump(ref zeusPosition, ref zeusVelocity, ref zeusIsJumping,
-                        ref zeusHasLandedOnPlayer, zeusJumpStartPosition, playerPosition, playerSize, groundTop, dt);
+                        ref zeusHasLandedOnPlayer, zeusJumpStartPosition, playerPosition, playerSize, zeusSize, groundTop, dt);
                     
                     if (zeusHasLandedOnPlayer)
                     {
@@ -156,7 +164,6 @@ namespace ProjectZeus.Core
                     }
                 }
 
-                Vector2 zeusSize = zeusSprite?.IsLoaded == true ? zeusSprite.Size : new Vector2(80, 120);
                 zeusPosition.X = MathHelper.Clamp(zeusPosition.X, 0f, baseScreenSize.X - zeusSize.X);
             }
             
