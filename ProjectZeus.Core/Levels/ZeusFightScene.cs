@@ -341,11 +341,22 @@ namespace ProjectZeus.Core
             else if (!zeusAngry)
             {
                 string instruction = currentPlacedItem == PillarItemType.None 
-                    ? "Press E near pillar to select item" 
+                    ? "Press E near pillar to cycle items (Gold/Blue/Purple)" 
                     : "Press ENTER to confirm sacrifice";
                 Vector2 textSize = titleFont.MeasureString(instruction);
                 Vector2 textPos = new Vector2((baseScreenSize.X - textSize.X) / 2f, 20);
                 spriteBatch.DrawString(titleFont, instruction, textPos, Color.Yellow);
+                
+                // Show current item selection
+                if (currentPlacedItem != PillarItemType.None)
+                {
+                    string itemName = currentPlacedItem == PillarItemType.Mountain ? "Mountain Item (Gold)" :
+                                      currentPlacedItem == PillarItemType.Mine ? "Mine Item (Blue)" :
+                                      "Maze Item (Purple)";
+                    Vector2 itemTextSize = titleFont.MeasureString(itemName);
+                    Vector2 itemTextPos = new Vector2((baseScreenSize.X - itemTextSize.X) / 2f, 45);
+                    spriteBatch.DrawString(titleFont, itemName, itemTextPos, Color.White);
+                }
             }
         }
     }
