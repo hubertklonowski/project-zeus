@@ -27,6 +27,10 @@ namespace ProjectZeus.Core.Game
         private MountainLevel mountainLevel;
         private ZeusFightScene zeusFightScene;
 
+        // When true, the player is acting as the goat at the top of the mountain
+        // and should be able to throw rocks like the original goat.
+        public bool IsPlayerGoatOnMountain { get; private set; }
+
         public GameScene CurrentScene { get; set; } = GameScene.PillarRoom;
         
         public bool HasCollectedMazeItem { get; set; }
@@ -100,6 +104,7 @@ namespace ProjectZeus.Core.Game
                 pillarRoom.MountainPortal.IsActive = false;
                 pillarRoom.CurrentCarriedItem = PillarItemType.Mountain;
                 resetPlayerAction?.Invoke();
+                IsPlayerGoatOnMountain = false;
             }
         }
 
@@ -111,6 +116,32 @@ namespace ProjectZeus.Core.Game
         public void ReplaceZeusFightScene(ZeusFightScene newZeusFightScene)
         {
             zeusFightScene = newZeusFightScene;
+        }
+
+        /// <summary>
+        /// Handles transition from Zeus fight to mountain level when the
+        /// player is turned into a goat and stomp sequence has finished.
+        /// </summary>
+        public void HandleZeusFightCompletion(System.Action<Vector2> setPlayerPosition)
+        {
+            if (zeusFightScene == null || !zeusFightScene.ShouldStartMountainAsGoat)
+                return;
+
+            // Switch to the mountain level.
+            CurrentScene = GameScene.MountainLevel;
+            IsPlayerGoatOnMountain = true;
+
+            Vector2 playerSize = player?.Size ?? new Vector2(32, 48);
+            Vector2 spawnPos = Vector2.Zero;
+
+            if (mountainLevel != null)
+            {
+                // Place player where the original goat was standing on the top platform.
+                spawnPos = mountainLevel.GetGoatSpawnPosition(playerSize);
+                mountainLevel.PlayerIsGoat = true;
+            }
+
+            setPlayerPosition?.Invoke(spawnPos);
         }
     }
 }

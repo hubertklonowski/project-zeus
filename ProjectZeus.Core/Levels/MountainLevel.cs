@@ -5,6 +5,7 @@ using AsepriteDotNet.Aseprite;
 using AsepriteDotNet.IO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
 using MonoGame.Aseprite;
 using ProjectZeus.Core.Rendering;
 using ProjectZeus.Core.Constants;
@@ -59,11 +60,21 @@ namespace ProjectZeus.Core
         
         // Rocks (projectiles)
         private List<Rock> rocks;
+
+        // Rock throwing cooldown for player-controlled goat
+        private float playerRockThrowCooldown = 0f;
+        private const float PlayerRockThrowDelay = 0.5f; // Half second delay between throws
         
         // Collectible item at mountain top
         private Vector2 itemPosition;
         private readonly Vector2 itemSize = new Vector2(30, 30);
         private bool itemCollected;
+
+        /// <summary>
+        /// When true, the player is controlling the goat position at the top of the
+        /// mountain and can throw rocks downward using input instead of the AI goat.
+        /// </summary>
+        public bool PlayerIsGoat { get; set; }
         
         public bool PlayerDied { get; private set; }
         public bool ItemWasCollected { get; private set; }
@@ -167,7 +178,24 @@ namespace ProjectZeus.Core
             return new Vector2(60f, groundTop - playerSize.Y);
         }
         
+        /// <summary>
+        /// Gets the position on the top platform where the original goat stands.
+        /// Used when the player replaces the goat after the Zeus fight.
+        /// </summary>
+        public Vector2 GetGoatSpawnPosition(Vector2 playerSize)
+        {
+            // Align player so its feet rest on the same top platform as the goat.
+            float x = goatPosition.X;
+            float y = goatPosition.Y + (goatSize.Y - playerSize.Y);
+            return new Vector2(x, y);
+        }
+        
         public void Update(GameTime gameTime, Vector2 playerPosition, Vector2 playerSize, bool tryPickupItem)
+        {
+            Update(gameTime, playerPosition, playerSize, tryPickupItem, null);
+        }
+        
+        public void Update(GameTime gameTime, Vector2 playerPosition, Vector2 playerSize, bool tryPickupItem, KeyboardState? keyboardState)
         {
             float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
             
@@ -180,27 +208,48 @@ namespace ProjectZeus.Core
                 movingPlatform.Update(dt);
             }
             
-            // Update goat movement (patrol back and forth on top platform)
-            goatPosition += goatVelocity * dt;
-            
-            // Keep goat on the platform - reverse direction when reaching edges
-            if (goatPosition.X <= topPlatformBounds.X)
+            // Update player rock throw cooldown
+            if (playerRockThrowCooldown > 0)
             {
-                goatPosition.X = topPlatformBounds.X;
-                goatVelocity.X = GoatMoveSpeed; // Move right
-            }
-            else if (goatPosition.X + goatSize.X >= topPlatformBounds.X + topPlatformBounds.Width)
-            {
-                goatPosition.X = topPlatformBounds.X + topPlatformBounds.Width - goatSize.X;
-                goatVelocity.X = -GoatMoveSpeed; // Move left
+                playerRockThrowCooldown -= dt;
             }
             
-            // Update goat throw timer
-            goatThrowTimer -= dt;
-            if (goatThrowTimer <= 0f)
+            if (!PlayerIsGoat)
             {
-                ThrowRock();
-                goatThrowTimer = GoatThrowInterval;
+                // Update goat movement (patrol back and forth on top platform)
+                goatPosition += goatVelocity * dt;
+                
+                // Keep goat on the platform - reverse direction when reaching edges
+                if (goatPosition.X <= topPlatformBounds.X)
+                {
+                    goatPosition.X = topPlatformBounds.X;
+                    goatVelocity.X = GoatMoveSpeed; // Move right
+                }
+                else if (goatPosition.X + goatSize.X >= topPlatformBounds.X + topPlatformBounds.Width)
+                {
+                    goatPosition.X = topPlatformBounds.X + topPlatformBounds.Width - goatSize.X;
+                    goatVelocity.X = -GoatMoveSpeed; // Move left
+                }
+                
+                // Update goat throw timer
+                goatThrowTimer -= dt;
+                if (goatThrowTimer <= 0f)
+                {
+                    ThrowRock(goatPosition + new Vector2(goatSize.X / 2f, goatSize.Y));
+                    goatThrowTimer = GoatThrowInterval;
+                }
+            }
+            else if (keyboardState.HasValue)
+            {
+                // Player controls goat-throwing: press E to throw rocks from player position.
+                var ks = keyboardState.Value;
+                if (ks.IsKeyDown(Keys.E) && playerRockThrowCooldown <= 0)
+                {
+                    // Cast from player position, slightly below their feet.
+                    Vector2 origin = new Vector2(playerPosition.X + playerSize.X / 2f, playerPosition.Y + playerSize.Y);
+                    ThrowRock(origin);
+                    playerRockThrowCooldown = PlayerRockThrowDelay;
+                }
             }
             
             // Update rocks
@@ -216,27 +265,30 @@ namespace ProjectZeus.Core
                     continue;
                 }
                 
-                // Check collision with player
-                Rectangle rockRect = new Rectangle(
-                    (int)rocks[i].Position.X,
-                    (int)rocks[i].Position.Y,
-                    (int)rocks[i].Size.X,
-                    (int)rocks[i].Size.Y);
-                    
-                Rectangle playerRect = new Rectangle(
-                    (int)playerPosition.X,
-                    (int)playerPosition.Y,
-                    (int)playerSize.X,
-                    (int)playerSize.Y);
-                
-                if (rockRect.Intersects(playerRect))
+                // Check collision with player only if player is NOT the goat
+                if (!PlayerIsGoat)
                 {
-                    PlayerDied = true;
+                    Rectangle rockRect = new Rectangle(
+                        (int)rocks[i].Position.X,
+                        (int)rocks[i].Position.Y,
+                        (int)rocks[i].Size.X,
+                        (int)rocks[i].Size.Y);
+                        
+                    Rectangle playerRect = new Rectangle(
+                        (int)playerPosition.X,
+                        (int)playerPosition.Y,
+                        (int)playerSize.X,
+                        (int)playerSize.Y);
+                    
+                    if (rockRect.Intersects(playerRect))
+                    {
+                        PlayerDied = true;
+                    }
                 }
             }
             
-            // Check if player can pick up item
-            if (!itemCollected && tryPickupItem)
+            // Check if player can pick up item (only if NOT the goat)
+            if (!PlayerIsGoat && !itemCollected && tryPickupItem)
             {
                 Rectangle itemRect = new Rectangle(
                     (int)itemPosition.X,
@@ -249,7 +301,7 @@ namespace ProjectZeus.Core
                     (int)playerPosition.Y,
                     (int)playerSize.X,
                     (int)playerSize.Y);
-                
+            
                 // Check if player is near the item
                 Rectangle expandedItemRect = itemRect;
                 expandedItemRect.Inflate(20, 20);
@@ -262,9 +314,9 @@ namespace ProjectZeus.Core
             }
         }
         
-        private void ThrowRock()
+        private void ThrowRock(Vector2 origin)
         {
-            // Goat throws rock downward with some randomness (70-110 degrees)
+            // Throw rock downward with some randomness (70-110 degrees)
             float angle = MathHelper.ToRadians(90f + (float)(random.NextDouble() * ThrowAngleVariation - ThrowAngleOffset));
             float speed = 200f;
             
@@ -275,7 +327,7 @@ namespace ProjectZeus.Core
             
             rocks.Add(new Rock
             {
-                Position = new Vector2(goatPosition.X + goatSize.X / 2f - rockSize.X / 2f, goatPosition.Y + goatSize.Y),
+                Position = new Vector2(origin.X - rockSize.X / 2f, origin.Y),
                 Size = rockSize,
                 Velocity = new Vector2((float)System.Math.Cos(angle) * speed, (float)System.Math.Sin(angle) * speed),
                 Rotation = 0f,
@@ -392,8 +444,8 @@ namespace ProjectZeus.Core
                 spriteBatch.Draw(solidTexture, rightArrow, new Color(60, 50, 40));
             }
             
-            // Draw goat using aseprite sprite
-            if (goatSprite != null && goatSprite.IsLoaded)
+            // Draw goat using aseprite sprite (only if player is not the goat)
+            if (!PlayerIsGoat && goatSprite != null && goatSprite.IsLoaded)
             {
                 // Check if goat is moving
                 bool isMoving = goatVelocity.LengthSquared() > 0;
@@ -407,7 +459,7 @@ namespace ProjectZeus.Core
                 SpriteEffects flip = goatVelocity.X < 0 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
                 goatSprite.Draw(spriteBatch, drawPos, isMoving, gameTime, Color.White, 10f, flip);
             }
-            else
+            else if (!PlayerIsGoat)
             {
                 // Fallback: Draw simple rectangle placeholder goat
                 Rectangle goatRect = new Rectangle(
@@ -536,6 +588,7 @@ namespace ProjectZeus.Core
             ItemWasCollected = false;
             PlayerDied = false;
             goatThrowTimer = GoatThrowInterval;
+            playerRockThrowCooldown = 0f;
             
             // Reset goat position and velocity
             if (topPlatformBounds.Width > 0)
@@ -543,6 +596,8 @@ namespace ProjectZeus.Core
                 goatPosition = new Vector2(topPlatformBounds.X + 50f, topPlatformBounds.Y - goatSize.Y);
                 goatVelocity = new Vector2(GoatMoveSpeed, 0f);
             }
+
+            PlayerIsGoat = false;
             
             // Reset moving platforms to starting positions
             foreach (var movingPlatform in movingPlatforms)
@@ -554,6 +609,14 @@ namespace ProjectZeus.Core
             
             // Reset camera to show bottom of level
             cameraOffset = new Vector2(0, worldHeight - baseScreenSize.Y);
+        }
+
+        /// <summary>
+        /// Gets the goat sprite for rendering when the player is transformed into a goat
+        /// </summary>
+        public AsepriteSprite GetGoatSprite()
+        {
+            return goatSprite;
         }
     }
 }

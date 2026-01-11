@@ -20,6 +20,10 @@ namespace ProjectZeus.Core
         public bool ShouldRestartGame { get; private set; }
         public bool PlayerTransformedToGoat { get; private set; }
 
+        // When true, the calling game code should transition to the mountain level
+        // and spawn the player where the goat used to be so they can throw rocks.
+        public bool ShouldStartMountainAsGoat { get; private set; }
+
         private readonly Vector2 baseScreenSize = new Vector2(800, 480);
         private Texture2D solidTexture;
         private SpriteFont titleFont;
@@ -68,6 +72,15 @@ namespace ProjectZeus.Core
         private float stompAnimationTime = 0f;
         private const float stompDuration = 2f;
         
+        // Zeus jump physics
+        private Vector2 zeusVelocity = Vector2.Zero;
+        private bool zeusIsJumping = false;
+        private bool zeusHasLandedOnPlayer = false;
+        private Vector2 zeusJumpStartPosition;
+        private const float zeusJumpSpeed = -600f;
+        private const float zeusGravity = 1200f;
+        private const float zeusHorizontalSpeed = 200f;
+
         // Player transformation state
         private bool playerTransformedToGoat = false;
         
@@ -143,19 +156,85 @@ namespace ProjectZeus.Core
                 IsCompleted = true;
                 return (playerVelocity, playerIsOnGround, playerTransformedToGoat);
             }
-            
+ 
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            float groundTop = baseScreenSize.Y * 0.7f;
+             
             // Handle Zeus stomping after goat transformation
             if (zeusStomp)
             {
-                stompAnimationTime += (float)gameTime.ElapsedGameTime.TotalSeconds;
-                // Don't restart game, just continue
-                // Player can still move as goat
+                stompAnimationTime += dt;
+
+                // Start jump if not already jumping
+                if (!zeusIsJumping && !zeusHasLandedOnPlayer)
+                {
+                    zeusIsJumping = true;
+                    zeusJumpStartPosition = zeusPosition;
+                    zeusVelocity.Y = zeusJumpSpeed;
+                    
+                    // Calculate horizontal velocity to move toward player
+                    float direction = Math.Sign(playerPosition.X - zeusPosition.X);
+                    zeusVelocity.X = direction * zeusHorizontalSpeed;
+                }
+
+                // Apply jump physics
+                if (zeusIsJumping)
+                {
+                    // Apply gravity
+                    zeusVelocity.Y += zeusGravity * dt;
+                    
+                    // Update Zeus position
+                    zeusPosition += zeusVelocity * dt;
+                    
+                    // Get Zeus size
+                    Vector2 zeusSize = zeusSprite?.IsLoaded == true ? zeusSprite.Size : new Vector2(80, 120);
+                    
+                    // Check if Zeus has landed back on ground
+                    if (zeusPosition.Y >= groundTop - zeusSize.Y)
+                    {
+                        zeusPosition.Y = groundTop - zeusSize.Y;
+                        zeusIsJumping = false;
+                        zeusVelocity = Vector2.Zero;
+                        
+                        // Check if Zeus landed on player (collision detection)
+                        Rectangle zeusRect = new Rectangle(
+                            (int)zeusPosition.X,
+                            (int)zeusPosition.Y,
+                            (int)zeusSize.X,
+                            (int)zeusSize.Y);
+                        
+                        Rectangle playerRect = new Rectangle(
+                            (int)playerPosition.X,
+                            (int)playerPosition.Y,
+                            (int)playerSize.X,
+                            (int)playerSize.Y);
+                        
+                        if (zeusRect.Intersects(playerRect))
+                        {
+                            zeusHasLandedOnPlayer = true;
+                            // Immediately transition to mountain level
+                            IsCompleted = true;
+                            ShouldStartMountainAsGoat = true;
+                        }
+                        else
+                        {
+                            // Zeus missed - reset timer to jump again soon
+                            stompAnimationTime = 0f;
+                        }
+                    }
+                }
+
+                // Clamp Zeus so he stays on screen horizontally
+                Vector2 zeusSize2 = zeusSprite?.IsLoaded == true ? zeusSprite.Size : new Vector2(80, 120);
+                float minZeusX = 0f;
+                float maxZeusX = baseScreenSize.X - zeusSize2.X;
+                zeusPosition.X = MathHelper.Clamp(zeusPosition.X, minZeusX, maxZeusX);
             }
             
             // Update timer only if not transformed to goat
             if (timerActive && !playerTransformedToGoat)
             {
-                remainingTime -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+                remainingTime -= dt;
                 if (remainingTime <= 0)
                 {
                     // Time's up! Wrong answer - transform to goat and Zeus stomps
@@ -168,9 +247,6 @@ namespace ProjectZeus.Core
             }
             
             // Apply physics to player (even as goat)
-            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
-            float groundTop = baseScreenSize.Y * 0.7f;
-            
             float move = 0f;
             if (keyboardState.IsKeyDown(Keys.Left) || keyboardState.IsKeyDown(Keys.A))
                 move -= 1f;
@@ -295,8 +371,8 @@ namespace ProjectZeus.Core
             // Draw Zeus using zus.aseprite sprite
             if (zeusSprite != null && zeusSprite.IsLoaded)
             {
-                // Zeus is moving/animated when stomping
-                bool isMoving = zeusStomp;
+                // Zeus is moving/animated when jumping or moving
+                bool isMoving = zeusIsJumping || Math.Abs(zeusVelocity.X) > 0;
                 zeusSprite.Draw(spriteBatch, zeusPosition, isMoving, gameTime, Color.White, 10f, SpriteEffects.None);
             }
             
@@ -412,9 +488,25 @@ namespace ProjectZeus.Core
             if (victoryAchieved)
             {
                 string victoryText = "GODS ARE SATISFIED!";
-                Vector2 textSize = titleFont.MeasureString(victoryText);
-                Vector2 textPos = new Vector2((baseScreenSize.X - textSize.X) / 2f, baseScreenSize.Y / 2f - textSize.Y / 2f);
-                spriteBatch.DrawString(titleFont, victoryText, textPos, Color.Gold);
+                
+                // Scale the text to make it bigger (2x size)
+                float scale = 2.0f;
+                Vector2 textSize = titleFont.MeasureString(victoryText) * scale;
+                
+                // Position at top center of screen
+                Vector2 textPos = new Vector2((baseScreenSize.X - textSize.X) / 2f, 40);
+                
+                // Draw shadow for better visibility (offset by 3 pixels)
+                spriteBatch.DrawString(titleFont, victoryText, textPos + new Vector2(3, 3), Color.Black, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                
+                // Draw main text in gold
+                spriteBatch.DrawString(titleFont, victoryText, textPos, Color.Gold, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                
+                // Draw outline for bold effect (draw slightly offset in 4 directions)
+                spriteBatch.DrawString(titleFont, victoryText, textPos + new Vector2(1, 0), Color.Gold, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                spriteBatch.DrawString(titleFont, victoryText, textPos + new Vector2(-1, 0), Color.Gold, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                spriteBatch.DrawString(titleFont, victoryText, textPos + new Vector2(0, 1), Color.Gold, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
+                spriteBatch.DrawString(titleFont, victoryText, textPos + new Vector2(0, -1), Color.Gold, 0f, Vector2.Zero, scale, SpriteEffects.None, 0f);
             }
             else if (playerTransformedToGoat)
             {
