@@ -16,14 +16,16 @@ As Adonis, you must prove your worth by collecting sacred items from three peril
 - **The Dark Mine** - Journey through treacherous mines filled with carts, stalactites, bats, and a giant bat boss
 - **Mount Olympus** - Climb the mountain while dodging rocks thrown by an angry goat
 
-Once all three items are collected and placed in the Pillar Room, you can enter the portal to face Zeus himself.
+Once all three items are collected and placed in the Pillar Room, you can enter the portal to face Zeus himself in a divine challenge!
 
 ## 🕹️ Controls
 
 ### Keyboard
 - **Arrow Keys** or **WASD** - Move left/right
 - **Space** or **W/Up Arrow** - Jump
-- **E** - Interact (collect items, enter portals, place items)
+- **E** - Interact (collect items, enter portals, place items, throw rocks as goat)
+- **Q/E** - Cycle through items during Zeus fight
+- **Enter** - Confirm item placement during Zeus fight
 
 ## 🎯 Levels
 
@@ -51,8 +53,15 @@ The central hub where you start. Contains three portals leading to different cha
 - Reach the top to collect the item
 
 ### Zeus Fight Scene
-- Final boss encounter (currently in development)
-- Triggered after placing all three items in the Pillar Room
+- Epic final boss encounter where you must prove your worth to Zeus
+- Place the three sacred items on the sacrifice pillar in the correct order
+- Zeus demands items in randomized Greek riddles - choose wisely!
+- You have 10 seconds to select and confirm each item using Q/E and Enter
+- Three correct answers satisfy the gods and grant you victory
+- Wrong answers or running out of time transforms you into a goat
+- As a goat, Zeus will hunt you down with powerful stomp attacks
+- If Zeus stomps on you, you're transported to the mountain top as the goat
+- Throw rocks at climbers below or wait 30 seconds for the credits!
 
 ## 🏗️ Project Structure
 
@@ -75,9 +84,9 @@ project-zeus/
 
 ### Prerequisites
 
-- .NET 8 SDK
+- .NET 10 SDK
 - MonoGame 3.8.4 or later
-- Visual Studio 2026 or Visual Studio Code
+- Visual Studio 2022 or Visual Studio Code
 
 ### Building
 
@@ -113,12 +122,12 @@ dotnet run
 
 The game uses Aseprite sprite files (`.aseprite`) for all visual assets:
 - **adonis.aseprite** - Player character with 8-frame walking animation
-- **zus.aseprite** - Zeus boss character
+- **zus.aseprite** - Zeus boss character with stomp animation
 - **minotaur.aseprite** - Maze level enemy
 - **cart.aseprite** - Mine carts
 - **bat.aseprite** - Flying bat enemies
 - **stalactite.aseprite** - Hanging obstacles
-- **goat.aseprite** - Mountain enemy
+- **goat.aseprite** - Mountain enemy and player transformation
 - **rock.aseprite** - Thrown projectiles
 - **grapes.aseprite**, **vase.aseprite**, **hedge.aseprite** - Maze decorations
 - **sandtile.aseprite** - Maze floor tiles
@@ -145,6 +154,9 @@ Music playback is supported on Windows platforms. The game includes background m
 - Animated sprites with automatic frame selection
 - Custom collision detection for platforms and entities
 - Item collection and progress tracking system
+- Dynamic boss fight with multiple outcomes
+- Player transformation mechanics
+- Timed puzzle-solving challenges
 
 ### Game Constants
 
@@ -157,18 +169,18 @@ Key gameplay values (found in `GameConstants.cs`):
 
 ## 🐛 Known Issues
 
-- Zeus fight scene is not yet fully implemented
 - Some collision detection edge cases may occur
 - Performance may vary on lower-end systems
 
 ## 🚀 Future Enhancements
 
-- [ ] Complete Zeus boss fight mechanics
-- [ ] Add sound effects
+- [ ] Add sound effects for actions and events
 - [ ] Implement power-ups and abilities
 - [ ] Add more levels and challenges
 - [ ] Create a main menu and pause system
 - [ ] Add save/load functionality
+- [ ] Multiple difficulty settings
+- [ ] Leaderboard for speedruns
 
 ## 📝 License
 
