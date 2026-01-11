@@ -57,8 +57,8 @@ with.
       </CharacterRegion>
       <!-- Greek characters -->
       <CharacterRegion>
-        <Start>&#0370;</Start>
-        <End>&#03FF;</End>
+        <Start>&#x0370;</Start>
+        <End>&#x03FF;</End>
       </CharacterRegion>
     </CharacterRegions>
   </Asset>

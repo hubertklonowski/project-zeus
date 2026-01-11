@@ -26,12 +26,13 @@ namespace ProjectZeus.Core
         private AsepriteSprite zeusSprite;
         private AsepriteSprite goatSprite;
         private AsepriteSprite grapesSprite;
-        private AsepriteSprite mineItemSprite;
-        private AsepriteSprite mountainItemSprite;
         
         private Vector2 zeusPosition;
         private Vector2 sacrificePillarPosition;
         private Vector2 sacrificePillarSize = new Vector2(80, 100);
+        
+        // Track goat facing direction
+        private SpriteEffects goatFlip = SpriteEffects.None;
         
         // Zeus dialogue state - mapping of dialogue to expected item
         private struct DialogueMapping
@@ -95,10 +96,8 @@ namespace ProjectZeus.Core
             // Load goat sprite for transformation
             goatSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Goat);
             
-            // Load item sprites
+            // Load grapes sprite for maze item (matching PillarRoom)
             grapesSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Grapes);
-            mineItemSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Cart); // Using cart as mine item
-            mountainItemSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Goat); // Using goat as mountain item placeholder
             
             // Position Zeus on the left side of the screen, standing on ground
             float groundTop = baseScreenSize.Y * 0.7f; // This is where ground starts (y = 336)
@@ -179,6 +178,12 @@ namespace ProjectZeus.Core
                 move += 1f;
 
             playerVelocity = new Vector2(move * 180f, playerVelocity.Y);
+            
+            // Update goat facing direction based on movement
+            if (playerVelocity.X < 0)
+                goatFlip = SpriteEffects.FlipHorizontally;
+            else if (playerVelocity.X > 0)
+                goatFlip = SpriteEffects.None;
 
             if (playerIsOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up) || keyboardState.IsKeyDown(Keys.W)))
             {
@@ -307,7 +312,8 @@ namespace ProjectZeus.Core
             // Draw player or goat
             if (playerIsGoat && goatSprite != null && goatSprite.IsLoaded)
             {
-                goatSprite.Draw(spriteBatch, player.Position, false, gameTime, Color.White, 10f, SpriteEffects.None);
+                // Draw goat with proper facing direction based on movement
+                goatSprite.Draw(spriteBatch, player.Position, false, gameTime, Color.White, 10f, goatFlip);
             }
             else
             {
@@ -349,41 +355,24 @@ namespace ProjectZeus.Core
                 30);
             spriteBatch.Draw(solidTexture, slotRect, new Color(200, 200, 220));
             
-            // Draw current item if selected (always visible on altar)
+            // Draw current item if selected (matching PillarRoom behavior)
             if (currentPlacedItem != PillarItemType.None)
             {
                 Vector2 slotCenter = new Vector2(slotRect.Center.X, slotRect.Center.Y);
                 
-                // Draw actual item sprites instead of colored rectangles
                 if (currentPlacedItem == PillarItemType.Maze && grapesSprite != null && grapesSprite.IsLoaded)
                 {
-                    // Draw grapes sprite
+                    // Draw grapes sprite for maze item
                     Vector2 drawPos = new Vector2(
                         slotCenter.X - grapesSprite.Size.X / 2f,
                         slotCenter.Y - grapesSprite.Size.Y / 2f);
                     grapesSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime, Color.White);
                 }
-                else if (currentPlacedItem == PillarItemType.Mine && mineItemSprite != null && mineItemSprite.IsLoaded)
-                {
-                    // Draw mine item sprite (cart)
-                    Vector2 drawPos = new Vector2(
-                        slotCenter.X - mineItemSprite.Size.X / 2f,
-                        slotCenter.Y - mineItemSprite.Size.Y / 2f);
-                    mineItemSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime, Color.White);
-                }
-                else if (currentPlacedItem == PillarItemType.Mountain)
-                {
-                    // Draw gold colored rectangle for mountain item
-                    Rectangle itemRect = slotRect;
-                    itemRect.Inflate(-5, -5);
-                    spriteBatch.Draw(solidTexture, itemRect, Color.Gold);
-                }
                 else
                 {
-                    // Fallback to colored rectangles
-                    Color itemColor = currentPlacedItem == PillarItemType.Mountain ? Color.Gold :
-                                      currentPlacedItem == PillarItemType.Mine ? Color.DeepSkyBlue :
-                                      Color.MediumVioletRed;
+                    // Mine and Mountain use colored rectangles (matching PillarRoom)
+                    // Mountain = Gold, Mine = DeepSkyBlue
+                    Color itemColor = currentPlacedItem == PillarItemType.Mountain ? Color.Gold : Color.DeepSkyBlue;
                     Rectangle itemRect = slotRect;
                     itemRect.Inflate(-5, -5);
                     spriteBatch.Draw(solidTexture, itemRect, itemColor);
