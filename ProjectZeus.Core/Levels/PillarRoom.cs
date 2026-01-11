@@ -1,10 +1,11 @@
 using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
 using ProjectZeus.Core.Constants;
+using PillarEntity = ProjectZeus.Core.Entities.Pillar;
 using ProjectZeus.Core.Entities;
 using ProjectZeus.Core.Rendering;
+using ProjectZeus.Core.Levels.Pillar;
 using MonoGame.Aseprite;
 
 namespace ProjectZeus.Core.Levels
@@ -14,25 +15,21 @@ namespace ProjectZeus.Core.Levels
     /// </summary>
     public class PillarRoom
     {
-        private Pillar[] pillars;
+        private PillarEntity[] pillars;
         private Portal mazePortal;
         private Portal minePortal;
         private Portal mountainPortal;
         
         private Texture2D pillarTexture;
-        private Texture2D slotTexture;
         private Texture2D skyTexture;
-        private Texture2D portalTexture;
         private SpriteFont font;
-        private AsepriteSprite mazeItemSprite; // grapes for maze item
+        private AsepriteSprite mazeItemSprite;
+        private PillarRoomRenderer renderer;
 
-        // Tracks which item is currently carried in the hub
         public PillarItemType CurrentCarriedItem { get; set; } = PillarItemType.None;
-
-        // Tracks which specific item is placed in each pillar
         private PillarItemType[] pillarItems;
 
-        public Pillar[] Pillars => pillars;
+        public PillarEntity[] Pillars => pillars;
         public Portal MazePortal => mazePortal;
         public Portal MinePortal => minePortal;
         public Portal MountainPortal => mountainPortal;
@@ -43,22 +40,22 @@ namespace ProjectZeus.Core.Levels
             this.font = font;
             
             pillarTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(230, 230, 230));
-            slotTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(200, 200, 255));
+            Texture2D slotTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(200, 200, 255));
             skyTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, new Color(135, 206, 235));
             
-            // Load portal texture from vase.aseprite using AsepriteSprite loader
             var vaseSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Vase);
+            Texture2D portalTexture = null;
             if (vaseSprite != null && vaseSprite.IsLoaded)
             {
-                // Use frame 0 (idle position) as the portal texture
                 portalTexture = vaseSprite.GetFrameTexture(0);
             }
 
-            // Load maze item sprite (grapes)
             mazeItemSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Grapes);
 
             SetupPillars();
             SetupPortals();
+            
+            renderer = new PillarRoomRenderer(pillarTexture, slotTexture, skyTexture, portalTexture, font, mazeItemSprite);
         }
 
         private void SetupPillars()
@@ -73,7 +70,7 @@ namespace ProjectZeus.Core.Levels
 
             pillars = new[]
             {
-                new Pillar 
+                new PillarEntity 
                 { 
                     Position = new Vector2(centerX - spacing, groundY), 
                     Size = pillarSize, 
@@ -82,7 +79,7 @@ namespace ProjectZeus.Core.Levels
                     HasItem = false,
                     ItemColor = Color.Gold
                 },
-                new Pillar 
+                new PillarEntity 
                 { 
                     Position = new Vector2(centerX, groundY), 
                     Size = pillarSize, 
@@ -91,7 +88,7 @@ namespace ProjectZeus.Core.Levels
                     HasItem = false,
                     ItemColor = Color.DeepSkyBlue
                 },
-                new Pillar 
+                new PillarEntity 
                 { 
                     Position = new Vector2(centerX + spacing, groundY), 
                     Size = pillarSize, 
@@ -190,169 +187,14 @@ namespace ProjectZeus.Core.Levels
 
         public void Draw(SpriteBatch spriteBatch, GameTime gameTime, bool hasItem)
         {
-            Rectangle skyRect = new Rectangle(0, 0, (int)GameConstants.BaseScreenSize.X, (int)GameConstants.BaseScreenSize.Y);
-            spriteBatch.Draw(skyTexture, skyRect, Color.White);
-
-            float t = (float)gameTime.TotalGameTime.TotalSeconds;
-            float cloudSpeed = 20f;
-            int cloudWidth = 160;
-            int cloudHeight = 60;
-
-            for (int i = 0; i < 3; i++)
-            {
-                float x = ((t * cloudSpeed) + i * 200f) % (GameConstants.BaseScreenSize.X + cloudWidth) - cloudWidth;
-                float y = 60f + i * 40f;
-                Rectangle cloudRect = new Rectangle((int)x, (int)y, cloudWidth, cloudHeight);
-                spriteBatch.Draw(skyTexture, cloudRect, new Color(250, 250, 250));
-            }
-
-            Rectangle groundRect = new Rectangle(0, (int)(GameConstants.BaseScreenSize.Y - GameConstants.GroundHeight), 
-                (int)GameConstants.BaseScreenSize.X, (int)GameConstants.GroundHeight);
-            spriteBatch.Draw(pillarTexture, groundRect, new Color(180, 180, 180));
-
-            for (int i = 0; i < pillars.Length; i++)
-            {
-                Pillar pillar = pillars[i];
-                Rectangle pillarRect = pillar.GetPillarRectangle();
-                spriteBatch.Draw(pillarTexture, pillarRect, Color.White);
-
-                int stripeCount = 4;
-                int stripeWidth = pillarRect.Width / (stripeCount * 2);
-                for (int s = 0; s < stripeCount; s++)
-                {
-                    int x = pillarRect.X + stripeWidth + s * stripeWidth * 2;
-                    Rectangle stripe = new Rectangle(x, pillarRect.Y, stripeWidth, pillarRect.Height);
-                    spriteBatch.Draw(pillarTexture, stripe, new Color(210, 210, 210));
-                }
-
-                Rectangle capitalRect = new Rectangle(pillarRect.X - 5, pillarRect.Y - 10, pillarRect.Width + 10, 10);
-                spriteBatch.Draw(pillarTexture, capitalRect, new Color(240, 240, 240));
-
-                Rectangle slotRect = pillar.GetSlotRectangle();
-
-                // Only draw the empty slot background when there is no item yet.
-                if (!pillar.HasItem)
-                {
-                    spriteBatch.Draw(slotTexture, slotRect, Color.White);
-                }
-
-                if (pillar.HasItem)
-                {
-                    PillarItemType itemType = pillarItems != null && i < pillarItems.Length
-                        ? pillarItems[i]
-                        : PillarItemType.None;
-
-                    if (itemType == PillarItemType.Maze && mazeItemSprite != null && mazeItemSprite.IsLoaded)
-                    {
-                        // Draw grapes in the slot, centered
-                        Vector2 slotCenter = new Vector2(slotRect.Center.X, slotRect.Center.Y);
-                        Vector2 drawPos = new Vector2(
-                            slotCenter.X - mazeItemSprite.Size.X / 2f,
-                            slotCenter.Y - mazeItemSprite.Size.Y / 2f);
-                        mazeItemSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime, Color.White);
-                    }
-                    else
-                    {
-                        // Mine/mountain (for now colored blocks)
-                        Rectangle itemRect = slotRect;
-                        itemRect.Inflate(-10, -10);
-                        spriteBatch.Draw(pillarTexture, itemRect, pillar.ItemColor);
-                    }
-                }
-                else
-                {
-                    // Empty slot: draw outline to indicate it is a target area.
-                    DrawingHelpers.DrawRectangleOutline(spriteBatch, pillarTexture, slotRect, Color.DarkBlue);
-                }
-
-            }
-
-            if (mazePortal.IsActive)
-            {
-                DrawingHelpers.DrawPortal(spriteBatch, portalTexture, mazePortal.Bounds, gameTime, mazePortal.BaseColor);
-                // Draw level name above portal
-                string levelName = "Maze";
-                Vector2 textSize = font.MeasureString(levelName);
-                Vector2 textPos = new Vector2(
-                    mazePortal.Position.X + mazePortal.Size.X / 2f - textSize.X / 2f,
-                    mazePortal.Position.Y - textSize.Y - 5f);
-                spriteBatch.DrawString(font, levelName, textPos, Color.White);
-            }
-
-            if (mountainPortal.IsActive)
-            {
-                DrawingHelpers.DrawPortal(spriteBatch, portalTexture, mountainPortal.Bounds, gameTime, mountainPortal.BaseColor);
-                // Draw level name above portal
-                string levelName = "Mountain";
-                Vector2 textSize = font.MeasureString(levelName);
-                Vector2 textPos = new Vector2(
-                    mountainPortal.Position.X + mountainPortal.Size.X / 2f - textSize.X / 2f,
-                    mountainPortal.Position.Y - textSize.Y - 5f);
-                spriteBatch.DrawString(font, levelName, textPos, Color.White);
-            }
-
-            if (minePortal.IsActive)
-            {
-                DrawingHelpers.DrawPortal(spriteBatch, portalTexture, minePortal.Bounds, gameTime, minePortal.BaseColor);
-                // Draw level name above portal at same height as other portals
-                string levelName = "Mine";
-                Vector2 textSize = font.MeasureString(levelName);
-                // Use bottom of portal instead of top to keep text at consistent height relative to ground
-                float groundTop = GameConstants.BaseScreenSize.Y - GameConstants.GroundHeight;
-                Vector2 textPos = new Vector2(
-                    minePortal.Position.X + minePortal.Size.X / 2f - textSize.X / 2f,
-                    groundTop - 80f - textSize.Y - 5f); // 80f is standard portal height
-                spriteBatch.DrawString(font, levelName, textPos, Color.White);
-            }
+            renderer.DrawBackground(spriteBatch, gameTime);
+            renderer.DrawPillars(spriteBatch, pillars, pillarItems, gameTime);
+            renderer.DrawPortals(spriteBatch, gameTime, mazePortal, minePortal, mountainPortal);
         }
 
         public void DrawUI(SpriteBatch spriteBatch, Texture2D itemTexture, bool hasAnyItem)
         {
-            if (hasAnyItem && CurrentCarriedItem != PillarItemType.None)
-            {
-                Rectangle inventoryRect = new Rectangle(10, 10, 40, 40);
-
-                spriteBatch.Draw(skyTexture, inventoryRect, Color.White);
-
-                if (CurrentCarriedItem == PillarItemType.Maze && mazeItemSprite != null && mazeItemSprite.IsLoaded)
-                {
-                    // Grapes icon for maze item
-                    Vector2 center = new Vector2(inventoryRect.Center.X, inventoryRect.Center.Y);
-                    Vector2 drawPos = new Vector2(
-                        center.X - mazeItemSprite.Size.X / 2f,
-                        center.Y - mazeItemSprite.Size.Y / 2f);
-                    mazeItemSprite.Draw(spriteBatch, drawPos, isMoving: false, gameTime: default, Color.White);
-                }
-                else
-                {
-                    // Mine/mountain: colored box with correct color
-                    Color itemColor = CurrentCarriedItem == PillarItemType.Mine 
-                        ? Color.DeepSkyBlue 
-                        : Color.Gold; // Mountain item is gold/yellow
-                    spriteBatch.Draw(itemTexture, inventoryRect, itemColor);
-                }
-
-                if (font != null)
-                {
-                    string inventoryText = "Item collected! Place it in a pillar.";
-                    Vector2 inventoryTextPos = new Vector2(60f, 20f);
-                    spriteBatch.DrawString(font, inventoryText, inventoryTextPos, Color.Gold);
-                }
-            }
-
-            string title = hasAnyItem
-                ? "Place the item in a pillar slot"
-                : "Enter portal or insert the three items of Zeus";
-            Vector2 titleSize = font.MeasureString(title);
-            Vector2 titlePos = new Vector2((GameConstants.BaseScreenSize.X - titleSize.X) / 2f, 40f);
-            spriteBatch.DrawString(font, title, titlePos, Color.Yellow);
-
-            string instructions = hasAnyItem
-                ? "Press E near an empty pillar to place the item"
-                : "Press E near a portal to enter a level";
-            Vector2 instructionsSize = font.MeasureString(instructions);
-            Vector2 instructionsPos = new Vector2((GameConstants.BaseScreenSize.X - instructionsSize.X) / 2f, 70f);
-            spriteBatch.DrawString(font, instructions, instructionsPos, Color.White);
+            renderer.DrawUI(spriteBatch, itemTexture, hasAnyItem, CurrentCarriedItem, default);
         }
     }
 }
