@@ -55,6 +55,16 @@ with.
         <Start>&#32;</Start>
         <End>&#126;</End>
       </CharacterRegion>
+      <!-- Greek characters -->
+      <CharacterRegion>
+        <Start>&#x0370;</Start>
+        <End>&#x03FF;</End>
+      </CharacterRegion>
+      <!-- Latin Extended-A (includes Polish characters like ł, ą, ę, ć, ń, ó, ś, ź, ż) -->
+      <CharacterRegion>
+        <Start>&#x0100;</Start>
+        <End>&#x017F;</End>
+      </CharacterRegion>
     </CharacterRegions>
   </Asset>
 </XnaContent>

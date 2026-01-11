@@ -99,7 +99,10 @@ namespace ProjectZeus.Core
             var zeusFightScene = new ZeusFightScene();
             zeusFightScene.LoadContent(GraphicsDevice, hudFont);
 
-            sceneManager = new SceneManager(player, pillarRoom, mineLevel, mazeLevel, mountainLevel, zeusFightScene);
+            var creditsScene = new CreditsScene();
+            creditsScene.LoadContent(GraphicsDevice, hudFont);
+
+            sceneManager = new SceneManager(player, pillarRoom, mineLevel, mazeLevel, mountainLevel, zeusFightScene, creditsScene);
 
             ResetPlayerToPillarRoom();
             
@@ -141,7 +144,7 @@ namespace ProjectZeus.Core
             switch (sceneManager.CurrentScene)
             {
                 case SceneManager.GameScene.ZeusFight:
-                    sceneManager.ZeusFightScene.Update(gameTime);
+                    UpdateZeusFight(gameTime);
                     break;
 
                 case SceneManager.GameScene.MazeLevel:
@@ -183,6 +186,15 @@ namespace ProjectZeus.Core
 
                 case SceneManager.GameScene.PillarRoom:
                     UpdatePillarRoom(gameTime);
+                    break;
+                
+                case SceneManager.GameScene.Credits:
+                    sceneManager.CreditsScene.Update(gameTime, keyboardState);
+                    if (sceneManager.CreditsScene.IsComplete)
+                    {
+                        // After credits, return to pillar room and reset everything
+                        RespawnAfterDeath();
+                    }
                     break;
             }
 
@@ -303,12 +315,18 @@ namespace ProjectZeus.Core
 
             player.Velocity = new Vector2(move * GameConstants.MoveSpeed, player.Velocity.Y);
 
+            // If player is the goat on top platform, restrict jumping
+            bool isPlayerGoatOnTop = sceneManager.IsPlayerGoatOnMountain;
+            
             if (player.IsOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up)))
             {
-                // Reduced jump height for mountain level to increase difficulty
-                float mountainJumpVelocity = GameConstants.JumpVelocity * GameConstants.MountainJumpReduction;
-                player.Velocity = new Vector2(player.Velocity.X, mountainJumpVelocity);
-                player.IsOnGround = false;
+                if (!isPlayerGoatOnTop)
+                {
+                    // Reduced jump height for mountain level to increase difficulty
+                    float mountainJumpVelocity = GameConstants.JumpVelocity * GameConstants.MountainJumpReduction;
+                    player.Velocity = new Vector2(player.Velocity.X, mountainJumpVelocity);
+                    player.IsOnGround = false;
+                }
             }
 
             player.Velocity = new Vector2(player.Velocity.X, player.Velocity.Y + GameConstants.Gravity * dt);
@@ -329,11 +347,26 @@ namespace ProjectZeus.Core
             // Clamp player X position to screen bounds, Y position to world bounds
             Vector2 tempPos = player.Position;
             
-            // Clamp X to screen
-            if (tempPos.X < 0)
-                tempPos.X = 0;
-            if (tempPos.X + playerSize.X > GameConstants.BaseScreenSize.X)
-                tempPos.X = GameConstants.BaseScreenSize.X - playerSize.X;
+            // If player is goat on top, constrain to top platform bounds only
+            if (isPlayerGoatOnTop)
+            {
+                // Get top platform bounds from mountain level
+                float topPlatformLeft = 200f; // baseScreenSize.X / 2f - 200f
+                float topPlatformRight = 600f; // baseScreenSize.X / 2f + 200f
+                
+                if (tempPos.X < topPlatformLeft)
+                    tempPos.X = topPlatformLeft;
+                if (tempPos.X + playerSize.X > topPlatformRight)
+                    tempPos.X = topPlatformRight - playerSize.X;
+            }
+            else
+            {
+                // Normal screen clamping for regular climbing
+                if (tempPos.X < 0)
+                    tempPos.X = 0;
+                if (tempPos.X + playerSize.X > GameConstants.BaseScreenSize.X)
+                    tempPos.X = GameConstants.BaseScreenSize.X - playerSize.X;
+            }
             
             // Clamp Y to world bounds (extended level height)
             float worldHeight = sceneManager.MountainLevel.WorldHeight;
@@ -349,7 +382,17 @@ namespace ProjectZeus.Core
             player.Position = tempPos;
 
             bool tryPickupItem = keyboardState.IsKeyDown(Keys.E);
-            sceneManager.MountainLevel.Update(gameTime, player.Position, playerSize, tryPickupItem);
+            
+            // Pass keyboard state to mountain level if player is goat (for rock throwing)
+            if (isPlayerGoatOnTop)
+            {
+                sceneManager.MountainLevel.Update(gameTime, player.Position, playerSize, tryPickupItem, keyboardState);
+            }
+            else
+            {
+                sceneManager.MountainLevel.Update(gameTime, player.Position, playerSize, tryPickupItem);
+            }
+            
             player.Update(gameTime);
 
             sceneManager.HandleMountainLevelCompletion(ResetPlayerToPillarRoom, RespawnAfterDeath);
@@ -360,6 +403,48 @@ namespace ProjectZeus.Core
                 sceneManager.CurrentScene = SceneManager.GameScene.PillarRoom;
                 ResetPlayerToPillarRoom();
             }
+        }
+
+        private void UpdateZeusFight(GameTime gameTime)
+        {
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            float groundTop = GameConstants.BaseScreenSize.Y * 0.7f;
+            Vector2 playerSize = player.Size;
+
+            // Update Zeus fight scene with player state
+            var (newVelocity, newIsOnGround, transformedToGoat) = sceneManager.ZeusFightScene.Update(
+                gameTime, keyboardState, player.Position, playerSize, player.Velocity, player.IsOnGround);
+            
+            player.Velocity = newVelocity;
+            player.IsOnGround = newIsOnGround;
+
+            // Apply position updates (allow movement even as goat)
+            player.Position += player.Velocity * dt;
+
+            // Ground collision
+            player.IsOnGround = false;
+            if (player.Position.Y + playerSize.Y >= groundTop)
+            {
+                player.Position = new Vector2(player.Position.X, groundTop - playerSize.Y);
+                player.Velocity = new Vector2(player.Velocity.X, 0f);
+                player.IsOnGround = true;
+            }
+
+            // Clamp player to screen bounds
+            Vector2 tempPos = player.Position;
+            Physics.PlatformerPhysics.ClampToScreen(ref tempPos, playerSize);
+            player.Position = tempPos;
+            
+            player.Update(gameTime);
+
+            // Check if Zeus fight should restart the game
+            if (sceneManager.ZeusFightScene.ShouldRestartGame)
+            {
+                RespawnAfterDeath();
+            }
+            
+            // Check if Zeus fight is complete and should transition to mountain level
+            sceneManager.HandleZeusFightCompletion((pos) => player.Position = pos);
         }
 
         private void RespawnAfterDeath()
@@ -375,6 +460,11 @@ namespace ProjectZeus.Core
             var newMazeLevel = new MazeLevel();
             newMazeLevel.LoadContent(GraphicsDevice, hudFont);
             sceneManager.ReplaceMazeLevel(newMazeLevel);
+            
+            // Recreate Zeus fight scene
+            var newZeusFightScene = new ZeusFightScene();
+            newZeusFightScene.LoadContent(GraphicsDevice, hudFont);
+            sceneManager.ReplaceZeusFightScene(newZeusFightScene);
             
             // Clear all collected items
             sceneManager.HasCollectedMountainItem = false;
@@ -396,7 +486,7 @@ namespace ProjectZeus.Core
             switch (sceneManager.CurrentScene)
             {
                 case SceneManager.GameScene.ZeusFight:
-                    sceneManager.ZeusFightScene.Draw(spriteBatch, GraphicsDevice, player, gameTime);
+                    sceneManager.ZeusFightScene.Draw(spriteBatch, GraphicsDevice, player, gameTime, sceneManager.ZeusFightScene.PlayerTransformedToGoat);
                     break;
 
                 case SceneManager.GameScene.MazeLevel:
@@ -407,7 +497,29 @@ namespace ProjectZeus.Core
                     sceneManager.MountainLevel.Draw(spriteBatch, GraphicsDevice, gameTime);
                     // Draw player with camera transform applied
                     spriteBatch.Begin(transformMatrix: sceneManager.MountainLevel.GetCameraTransform());
-                    player.Draw(gameTime, spriteBatch);
+                    
+                    // Draw player as goat if they are controlling the goat on top
+                    if (sceneManager.IsPlayerGoatOnMountain)
+                    {
+                        var goatSprite = sceneManager.MountainLevel.GetGoatSprite();
+                        if (goatSprite != null && goatSprite.IsLoaded)
+                        {
+                            // Determine facing direction based on velocity
+                            SpriteEffects flip = player.Velocity.X < 0 ? SpriteEffects.FlipHorizontally : SpriteEffects.None;
+                            bool isMoving = Math.Abs(player.Velocity.X) > 0;
+                            goatSprite.Draw(spriteBatch, player.Position, isMoving, gameTime, Color.White, 10f, flip);
+                        }
+                        else
+                        {
+                            // Fallback to normal player drawing
+                            player.Draw(gameTime, spriteBatch);
+                        }
+                    }
+                    else
+                    {
+                        player.Draw(gameTime, spriteBatch);
+                    }
+                    
                     spriteBatch.End();
                     break;
 
@@ -435,6 +547,10 @@ namespace ProjectZeus.Core
                     sceneManager.PillarRoom.DrawUI(spriteBatch, playerTexture, hasAnyItem);
                     
                     spriteBatch.End();
+                    break;
+                
+                case SceneManager.GameScene.Credits:
+                    sceneManager.CreditsScene.Draw(spriteBatch, GraphicsDevice);
                     break;
             }
 
