@@ -107,5 +107,10 @@ namespace ProjectZeus.Core.Game
         {
             mazeLevel = newMazeLevel;
         }
+
+        public void ReplaceZeusFightScene(ZeusFightScene newZeusFightScene)
+        {
+            zeusFightScene = newZeusFightScene;
+        }
     }
 }
