@@ -18,5 +18,8 @@ namespace ProjectZeus.Core.Constants
         public const string SandTile = "Content/Sprites/sandtile.aseprite";
         public const string Stalactite = "Content/Sprites/stalactite.aseprite";
         public const string Vase = "Content/Sprites/vase.aseprite";
+        public const string MineFloor1 = "Content/Sprites/minefloor1.aseprite";
+        public const string MineFloor2 = "Content/Sprites/minefloor2.aseprite";
+        public const string MineFloor3 = "Content/Sprites/minefloor3.aseprite";
     }
 }

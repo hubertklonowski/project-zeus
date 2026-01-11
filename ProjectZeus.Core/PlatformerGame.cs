@@ -43,6 +43,7 @@ namespace ProjectZeus.Core
 
         private SceneManager sceneManager;
         private AdonisPlayer player;
+        private SceneUpdater sceneUpdater;
 
         public PlatformerGame()
         {
@@ -62,50 +63,27 @@ namespace ProjectZeus.Core
 
         protected override void LoadContent()
         {
-            this.Content.RootDirectory = "Content";
-
-            spriteBatch = new SpriteBatch(GraphicsDevice);
-            hudFont = Content.Load<SpriteFont>("Fonts/Hud");
-
             ScalePresentationArea();
-
-            virtualGamePad = new VirtualGamePad(GameConstants.BaseScreenSize, globalTransformation, 
-                Content.Load<Texture2D>("Sprites/VirtualControlArrow"));
-
-            if (!OperatingSystem.IsIOS())
-            {
-                try
-                {
-                    MediaPlayer.IsRepeating = true;
-                    MediaPlayer.Play(Content.Load<Song>("Sounds/Music"));
-                }
-                catch { }
-            }
-
-            playerTexture = DrawingHelpers.CreateSolidTexture(GraphicsDevice, 1, 1, new Color(255, 220, 180));
-
-            player = new AdonisPlayer();
-            player.LoadContent(GraphicsDevice);
-
-            var pillarRoom = new PillarRoom();
-            pillarRoom.LoadContent(GraphicsDevice, hudFont);
-
-            var mineLevel = new MineLevel();
-            mineLevel.LoadContent(GraphicsDevice, hudFont);
-
-            var mazeLevel = new MazeLevel();
-            mazeLevel.LoadContent(GraphicsDevice, hudFont);
-
-            var mountainLevel = new MountainLevel();
-            mountainLevel.LoadContent(GraphicsDevice, hudFont);
-
-            var zeusFightScene = new ZeusFightScene();
-            zeusFightScene.LoadContent(GraphicsDevice, hudFont);
-
-            var creditsScene = new CreditsScene();
-            creditsScene.LoadContent(GraphicsDevice, hudFont);
+            
+            var contentLoader = new GameContentLoader();
+            contentLoader.LoadGameContent(
+                GraphicsDevice,
+                Content,
+                out spriteBatch,
+                out hudFont,
+                out playerTexture,
+                out virtualGamePad,
+                out player,
+                out var pillarRoom,
+                out var mineLevel,
+                out var mazeLevel,
+                out var mountainLevel,
+                out var zeusFightScene,
+                out var creditsScene,
+                globalTransformation);
 
             sceneManager = new SceneManager(player, pillarRoom, mineLevel, mazeLevel, mountainLevel, zeusFightScene, creditsScene);
+            sceneUpdater = new SceneUpdater(sceneManager, player);
 
             ResetPlayerToPillarRoom();
             
@@ -147,57 +125,37 @@ namespace ProjectZeus.Core
             switch (sceneManager.CurrentScene)
             {
                 case SceneManager.GameScene.ZeusFight:
-                    UpdateZeusFight(gameTime);
+                    sceneUpdater.UpdateZeusFight(gameTime, keyboardState, RespawnAfterDeath, pos => player.Position = pos);
                     break;
-
                 case SceneManager.GameScene.MazeLevel:
                     sceneManager.MazeLevel.Update(gameTime, keyboardState);
-                    
-                    // Handle player caught by minotaur - use unified death handler
                     if (sceneManager.MazeLevel.PlayerCaughtByMinotaur)
-                    {
                         RespawnAfterDeath();
-                    }
                     else
-                    {
                         sceneManager.HandleMazeLevelCompletion(GraphicsDevice, hudFont, ResetPlayerToPillarRoom);
-                    }
                     break;
-
                 case SceneManager.GameScene.MineLevel:
                     sceneManager.MineLevel.Update(gameTime, keyboardState, previousKeyboardState);
-                    
-                    // Handle death - use unified death handler
                     if (sceneManager.MineLevel.PlayerDied)
-                    {
                         RespawnAfterDeath();
-                    }
                     else if (!sceneManager.MineLevel.IsActive)
-                    {
                         sceneManager.HandleMineLevelCompletion(ResetPlayerToPillarRoom);
-                    }
                     else
                     {
                         player.Position = sceneManager.MineLevel.PlayerPosition;
                         player.Velocity = sceneManager.MineLevel.PlayerVelocity;
                     }
                     break;
-
                 case SceneManager.GameScene.MountainLevel:
-                    UpdateMountainLevel(gameTime);
+                    sceneUpdater.UpdateMountainLevel(gameTime, keyboardState, ResetPlayerToPillarRoom, RespawnAfterDeath);
                     break;
-
                 case SceneManager.GameScene.PillarRoom:
-                    UpdatePillarRoom(gameTime);
+                    sceneUpdater.UpdatePillarRoom(gameTime, keyboardState, previousKeyboardState, ResetPlayerToPillarRoom);
                     break;
-                
                 case SceneManager.GameScene.Credits:
                     sceneManager.CreditsScene.Update(gameTime, keyboardState);
                     if (sceneManager.CreditsScene.IsComplete)
-                    {
-                        // After credits, return to pillar room and reset everything
                         RespawnAfterDeath();
-                    }
                     break;
             }
 
@@ -205,282 +163,29 @@ namespace ProjectZeus.Core
             base.Update(gameTime);
         }
 
-        private void UpdatePillarRoom(GameTime gameTime)
-        {
-            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
-            float groundTop = GameConstants.BaseScreenSize.Y - GameConstants.GroundHeight;
-
-            float move = 0f;
-            if (keyboardState.IsKeyDown(Keys.Left) || keyboardState.IsKeyDown(Keys.A))
-                move -= 1f;
-            if (keyboardState.IsKeyDown(Keys.Right) || keyboardState.IsKeyDown(Keys.D))
-                move += 1f;
-
-            player.Velocity = new Vector2(move * GameConstants.MoveSpeed, player.Velocity.Y);
-
-            if (player.IsOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up)))
-            {
-                player.Velocity = new Vector2(player.Velocity.X, GameConstants.JumpVelocity);
-                player.IsOnGround = false;
-            }
-
-            player.Velocity = new Vector2(player.Velocity.X, player.Velocity.Y + GameConstants.Gravity * dt);
-            player.Position += player.Velocity * dt;
-
-            player.IsOnGround = false;
-
-            // Use player.Size for consistent collision with visual size
-            Vector2 playerSize = player.Size;
-            
-            if (player.Position.Y + playerSize.Y >= groundTop)
-            {
-                player.Position = new Vector2(player.Position.X, groundTop - playerSize.Y);
-                player.Velocity = new Vector2(player.Velocity.X, 0f);
-                player.IsOnGround = true;
-            }
-
-            foreach (Pillar pillar in sceneManager.PillarRoom.Pillars)
-            {
-                Rectangle pillarRect = pillar.GetPillarRectangle();
-                Vector2 correctedPos;
-                if (Physics.PlatformerPhysics.CheckPlatformCollision(player.Bounds, pillarRect, player.Velocity, out correctedPos))
-                {
-                    player.Position = correctedPos;
-                    player.Velocity = new Vector2(player.Velocity.X, 0f);
-                    player.IsOnGround = true;
-                }
-            }
-
-            Vector2 tempPos = player.Position;
-            Physics.PlatformerPhysics.ClampToScreen(ref tempPos, playerSize);
-            player.Position = tempPos;
-            player.Update(gameTime);
-
-            bool hasAnyItem = sceneManager.HasCollectedMazeItem || sceneManager.HasCollectedMineItem || sceneManager.HasCollectedMountainItem;
-            bool eKeyPressed = keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E);
-
-            if (eKeyPressed && hasAnyItem && sceneManager.PillarRoom.CurrentCarriedItem != PillarItemType.None)
-            {
-                if (sceneManager.PillarRoom.TryInsertItem(player.Position, playerSize))
-                {
-                    sceneManager.HasCollectedMazeItem = false;
-                    sceneManager.HasCollectedMineItem = false;
-                    sceneManager.HasCollectedMountainItem = false;
-                }
-            }
-
-            if (eKeyPressed && sceneManager.PillarRoom.MazePortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMazeItem)
-            {
-                sceneManager.CurrentScene = SceneManager.GameScene.MazeLevel;
-                return;
-            }
-
-            if (eKeyPressed && sceneManager.PillarRoom.MinePortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMineItem)
-            {
-                sceneManager.CurrentScene = SceneManager.GameScene.MineLevel;
-                sceneManager.MineLevel.Enter();
-                return;
-            }
-
-            if (eKeyPressed && sceneManager.PillarRoom.MountainPortal.Intersects(player.Bounds) && !sceneManager.HasCollectedMountainItem)
-            {
-                sceneManager.CurrentScene = SceneManager.GameScene.MountainLevel;
-                sceneManager.MountainLevel.Reset();
-                // Spawn player at the bottom of the extended mountain level
-                player.Position = sceneManager.MountainLevel.GetPlayerSpawnPosition(playerSize);
-                player.Velocity = Vector2.Zero;
-                player.IsOnGround = true;
-                return;
-            }
-
-            if (sceneManager.PillarRoom.AllItemsInserted)
-            {
-                sceneManager.CurrentScene = SceneManager.GameScene.ZeusFight;
-                float fightGroundTop = GameConstants.BaseScreenSize.Y * 0.7f;
-                // Position player on the right side, facing left toward Zeus
-                player.Position = new Vector2(GameConstants.BaseScreenSize.X - playerSize.X - 40f, 
-                    fightGroundTop - playerSize.Y);
-                // Set negative velocity to make player face left
-                player.Velocity = new Vector2(-1f, 0f);
-                player.IsOnGround = true;
-            }
-        }
-
-        private void UpdateMountainLevel(GameTime gameTime)
-        {
-            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
-
-            float move = 0f;
-            if (keyboardState.IsKeyDown(Keys.Left) || keyboardState.IsKeyDown(Keys.A))
-                move -= 1f;
-            if (keyboardState.IsKeyDown(Keys.Right) || keyboardState.IsKeyDown(Keys.D))
-                move += 1f;
-
-            player.Velocity = new Vector2(move * GameConstants.MoveSpeed, player.Velocity.Y);
-
-            // If player is the goat on top platform, restrict jumping
-            bool isPlayerGoatOnTop = sceneManager.IsPlayerGoatOnMountain;
-            
-            if (player.IsOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up)))
-            {
-                if (!isPlayerGoatOnTop)
-                {
-                    // Reduced jump height for mountain level to increase difficulty
-                    float mountainJumpVelocity = GameConstants.JumpVelocity * GameConstants.MountainJumpReduction;
-                    player.Velocity = new Vector2(player.Velocity.X, mountainJumpVelocity);
-                    player.IsOnGround = false;
-                }
-            }
-
-            player.Velocity = new Vector2(player.Velocity.X, player.Velocity.Y + GameConstants.Gravity * dt);
-            player.Position += player.Velocity * dt;
-
-            // Use player.Size for consistent collision
-            Vector2 playerSize = player.Size;
-
-            Vector2 correctedPosition;
-            player.IsOnGround = sceneManager.MountainLevel.CheckPlatformCollision(player.Bounds, player.Velocity, out correctedPosition);
-
-            if (player.IsOnGround)
-            {
-                player.Position = correctedPosition;
-                player.Velocity = new Vector2(player.Velocity.X, 0f);
-            }
-
-            // Clamp player X position to screen bounds, Y position to world bounds
-            Vector2 tempPos = player.Position;
-            
-            // If player is goat on top, constrain to top platform bounds only
-            if (isPlayerGoatOnTop)
-            {
-                // Get top platform bounds from mountain level
-                float topPlatformLeft = 200f; // baseScreenSize.X / 2f - 200f
-                float topPlatformRight = 600f; // baseScreenSize.X / 2f + 200f
-                
-                if (tempPos.X < topPlatformLeft)
-                    tempPos.X = topPlatformLeft;
-                if (tempPos.X + playerSize.X > topPlatformRight)
-                    tempPos.X = topPlatformRight - playerSize.X;
-            }
-            else
-            {
-                // Normal screen clamping for regular climbing
-                if (tempPos.X < 0)
-                    tempPos.X = 0;
-                if (tempPos.X + playerSize.X > GameConstants.BaseScreenSize.X)
-                    tempPos.X = GameConstants.BaseScreenSize.X - playerSize.X;
-            }
-            
-            // Clamp Y to world bounds (extended level height)
-            float worldHeight = sceneManager.MountainLevel.WorldHeight;
-            if (tempPos.Y < 0)
-                tempPos.Y = 0;
-            if (tempPos.Y + playerSize.Y > worldHeight - GameConstants.GroundHeight)
-            {
-                tempPos.Y = worldHeight - GameConstants.GroundHeight - playerSize.Y;
-                player.Velocity = new Vector2(player.Velocity.X, 0f);
-                player.IsOnGround = true;
-            }
-            
-            player.Position = tempPos;
-
-            bool tryPickupItem = keyboardState.IsKeyDown(Keys.E);
-            
-            // Pass keyboard state to mountain level if player is goat (for rock throwing)
-            if (isPlayerGoatOnTop)
-            {
-                sceneManager.MountainLevel.Update(gameTime, player.Position, playerSize, tryPickupItem, keyboardState);
-            }
-            else
-            {
-                sceneManager.MountainLevel.Update(gameTime, player.Position, playerSize, tryPickupItem);
-            }
-            
-            player.Update(gameTime);
-
-            sceneManager.HandleMountainLevelCompletion(ResetPlayerToPillarRoom, RespawnAfterDeath);
-
-            const float leftEdgeThreshold = 10f;
-            if (player.Position.X <= leftEdgeThreshold && sceneManager.HasCollectedMountainItem)
-            {
-                sceneManager.CurrentScene = SceneManager.GameScene.PillarRoom;
-                ResetPlayerToPillarRoom();
-            }
-        }
-
-        private void UpdateZeusFight(GameTime gameTime)
-        {
-            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
-            float groundTop = GameConstants.BaseScreenSize.Y * 0.7f;
-            Vector2 playerSize = player.Size;
-
-            // Update Zeus fight scene with player state
-            var (newVelocity, newIsOnGround, transformedToGoat) = sceneManager.ZeusFightScene.Update(
-                gameTime, keyboardState, player.Position, playerSize, player.Velocity, player.IsOnGround);
-            
-            player.Velocity = newVelocity;
-            player.IsOnGround = newIsOnGround;
-
-            // Apply position updates (allow movement even as goat)
-            player.Position += player.Velocity * dt;
-
-            // Ground collision
-            player.IsOnGround = false;
-            if (player.Position.Y + playerSize.Y >= groundTop)
-            {
-                player.Position = new Vector2(player.Position.X, groundTop - playerSize.Y);
-                player.Velocity = new Vector2(player.Velocity.X, 0f);
-                player.IsOnGround = true;
-            }
-
-            // Clamp player to screen bounds
-            Vector2 tempPos = player.Position;
-            Physics.PlatformerPhysics.ClampToScreen(ref tempPos, playerSize);
-            player.Position = tempPos;
-            
-            player.Update(gameTime);
-
-            // Check if Zeus fight should restart the game
-            if (sceneManager.ZeusFightScene.ShouldRestartGame)
-            {
-                RespawnAfterDeath();
-            }
-            
-            // Check if Zeus fight is complete and should transition to mountain level
-            sceneManager.HandleZeusFightCompletion((pos) => player.Position = pos);
-        }
-
         private void RespawnAfterDeath()
         {
-            // Unified death handler - resets all progress regardless of which level player died in
             sceneManager.CurrentScene = SceneManager.GameScene.PillarRoom;
-            
-            // Reset all levels
             sceneManager.MountainLevel.Reset();
             sceneManager.MineLevel.Reset();
             
-            // Recreate maze level (it doesn't have a Reset method, needs fresh instance)
             var newMazeLevel = new MazeLevel();
             newMazeLevel.LoadContent(GraphicsDevice, hudFont);
             sceneManager.ReplaceMazeLevel(newMazeLevel);
             
-            // Recreate Zeus fight scene
             var newZeusFightScene = new ZeusFightScene();
             newZeusFightScene.LoadContent(GraphicsDevice, hudFont);
             sceneManager.ReplaceZeusFightScene(newZeusFightScene);
             
-            // Clear all collected items
             sceneManager.HasCollectedMountainItem = false;
             sceneManager.HasCollectedMazeItem = false;
             sceneManager.HasCollectedMineItem = false;
             
-            // Reset pillar room state
             sceneManager.PillarRoom.ResetItems();
             sceneManager.PillarRoom.MazePortal.IsActive = true;
             sceneManager.PillarRoom.MountainPortal.IsActive = true;
             sceneManager.PillarRoom.MinePortal.IsActive = true;
             
-            // Reset player position
             ResetPlayerToPillarRoom();
         }
 

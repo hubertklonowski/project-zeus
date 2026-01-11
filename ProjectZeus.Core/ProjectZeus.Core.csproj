@@ -28,6 +28,15 @@
     <None Update="Content\Sprites\hedge.aseprite">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Content\Sprites\minefloor1.aseprite">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Content\Sprites\minefloor2.aseprite">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Content\Sprites\minefloor3.aseprite">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Content\Sprites\minotaur.aseprite">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
