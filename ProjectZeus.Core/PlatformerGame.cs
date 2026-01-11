@@ -55,6 +55,9 @@ namespace ProjectZeus.Core
             graphics.SupportedOrientations = DisplayOrientation.LandscapeLeft | DisplayOrientation.LandscapeRight;
 
             IsMouseVisible = true;
+            
+            // Set the window title
+            Window.Title = "Project Zeus";
         }
 
         protected override void LoadContent()
