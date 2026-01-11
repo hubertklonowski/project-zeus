@@ -1,15 +1,13 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using AsepriteDotNet.Aseprite;
-using AsepriteDotNet.IO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using MonoGame.Aseprite;
 using ProjectZeus.Core.Rendering;
 using ProjectZeus.Core.Constants;
 using ProjectZeus.Core.Levels;
+using ProjectZeus.Core.Utilities;
+using ProjectZeus.Core.Extensions;
 
 namespace ProjectZeus.Core
 {
@@ -24,8 +22,8 @@ namespace ProjectZeus.Core
         // World dimensions - level spans multiple screens vertically
         private float worldHeight;
         
-        // Camera offset for scrolling
-        private Vector2 cameraOffset;
+        // Camera
+        private CameraController camera;
         
         // Textures
         private Texture2D solidTexture;
@@ -96,7 +94,7 @@ namespace ProjectZeus.Core
         /// <summary>
         /// Gets the current camera offset for rendering
         /// </summary>
-        public Vector2 CameraOffset => cameraOffset;
+        public Vector2 CameraOffset => camera.CameraOffset;
         
         public MountainLevel()
         {
@@ -107,7 +105,6 @@ namespace ProjectZeus.Core
             PlayerDied = false;
             ItemWasCollected = false;
             ShouldShowCredits = false;
-            cameraOffset = Vector2.Zero;
         }
         
         public void LoadContent(GraphicsDevice graphicsDevice, SpriteFont font)
@@ -126,6 +123,10 @@ namespace ProjectZeus.Core
             
             // Build the mountain structure with platforms
             SetupMountain();
+            
+            // Initialize camera
+            camera = new CameraController(baseScreenSize.X, baseScreenSize.Y, baseScreenSize.X, worldHeight);
+            camera.SetToBottom();
         }
         
         private void SetupMountain()
@@ -156,9 +157,6 @@ namespace ProjectZeus.Core
             
             // Position item on the top platform with the goat
             itemPosition = new Vector2(topPlatformX + topPlatformWidth - 60f, topPlatformY - itemSize.Y);
-            
-            // Initialize camera to show bottom of level (where player starts)
-            cameraOffset = new Vector2(0, worldHeight - baseScreenSize.Y);
         }
         
         /// <summary>
@@ -166,17 +164,7 @@ namespace ProjectZeus.Core
         /// </summary>
         public void UpdateCamera(Vector2 playerPosition)
         {
-            // Camera follows player vertically, keeping player in center-bottom portion of screen
-            float targetCameraY = playerPosition.Y - baseScreenSize.Y * 0.6f;
-            
-            // Clamp camera to world bounds
-            targetCameraY = MathHelper.Clamp(targetCameraY, 0, worldHeight - baseScreenSize.Y);
-            
-            // Smooth camera follow
-            cameraOffset.Y = MathHelper.Lerp(cameraOffset.Y, targetCameraY, 0.1f);
-            
-            // Keep X at 0 (no horizontal scrolling)
-            cameraOffset.X = 0;
+            camera.FollowPlayerVertical(playerPosition);
         }
         
         /// <summary>

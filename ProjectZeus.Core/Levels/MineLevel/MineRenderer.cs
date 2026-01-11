@@ -1,5 +1,8 @@
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using ProjectZeus.Core.Entities;
+using ProjectZeus.Core.Rendering;
 
 namespace ProjectZeus.Core.Levels.MineLevel
 {
@@ -9,6 +12,8 @@ namespace ProjectZeus.Core.Levels.MineLevel
     public class MineRenderer
     {
         private readonly Texture2D solidTexture;
+        private const float ScreenWidth = 800f;
+        private const float ScreenHeight = 480f;
 
         public MineRenderer(Texture2D solidTexture)
         {
@@ -70,6 +75,72 @@ namespace ProjectZeus.Core.Levels.MineLevel
                     Rectangle innerFlame = new Rectangle(x - 1, (int)(groundTop - 62), 10, 10);
                     spriteBatch.Draw(solidTexture, innerFlame, new Color((byte)(255 * flicker), (byte)(255 * flicker), 100));
                 }
+            }
+        }
+
+        public void DrawVisibleEntities(SpriteBatch spriteBatch, GameTime gameTime, float cameraOffsetX,
+            List<Stalactite> stalactites, List<MineCart> carts, List<MineBat> bats, GigaBat gigaBat, List<Guano> guanos)
+        {
+            foreach (var stalactite in stalactites)
+            {
+                if (stalactite.Position.X >= cameraOffsetX - 50 && 
+                    stalactite.Position.X <= cameraOffsetX + ScreenWidth + 50)
+                {
+                    stalactite.Draw(spriteBatch, gameTime);
+                }
+            }
+            
+            foreach (var cart in carts)
+            {
+                if (cart.Position.X >= cameraOffsetX - 100 && 
+                    cart.Position.X <= cameraOffsetX + ScreenWidth + 100)
+                {
+                    cart.Draw(spriteBatch, solidTexture, gameTime);
+                }
+            }
+            
+            foreach (var bat in bats)
+            {
+                if (bat.Position.X >= cameraOffsetX - 50 && 
+                    bat.Position.X <= cameraOffsetX + ScreenWidth + 50)
+                {
+                    bat.Draw(spriteBatch, solidTexture, gameTime);
+                }
+            }
+            
+            if (gigaBat != null && gigaBat.Position.X >= cameraOffsetX - 100 && 
+                gigaBat.Position.X <= cameraOffsetX + ScreenWidth + 100)
+            {
+                gigaBat.Draw(spriteBatch, solidTexture, gameTime);
+            }
+            
+            foreach (var guano in guanos)
+            {
+                if (guano.Position.X >= cameraOffsetX - 50 && 
+                    guano.Position.X <= cameraOffsetX + ScreenWidth + 50)
+                {
+                    guano.Draw(spriteBatch, solidTexture);
+                }
+            }
+        }
+
+        public void DrawCollectibles(SpriteBatch spriteBatch, GameTime gameTime, Texture2D portalTexture, float cameraOffsetX,
+            Rectangle itemRect, bool itemCollected, Portal exitPortal)
+        {
+            if (!itemCollected && itemRect.X >= cameraOffsetX - 50 && 
+                itemRect.X <= cameraOffsetX + ScreenWidth + 50)
+            {
+                spriteBatch.Draw(solidTexture, itemRect, Color.Gold);
+                Rectangle glowRect = itemRect;
+                glowRect.Inflate(5, 5);
+                spriteBatch.Draw(solidTexture, glowRect, new Color(255, 215, 0, 100));
+            }
+            
+            if (exitPortal != null && exitPortal.IsActive && 
+                exitPortal.Position.X >= cameraOffsetX - 100 && 
+                exitPortal.Position.X <= cameraOffsetX + ScreenWidth + 100)
+            {
+                DrawingHelpers.DrawPortal(spriteBatch, portalTexture, exitPortal.Bounds, gameTime, exitPortal.BaseColor);
             }
         }
     }
