@@ -116,7 +116,7 @@ namespace ProjectZeus.Core.Levels.Mountain
                 : "Climb to the top and collect the item. Watch out for falling rocks!";
             
             if (playerIsGoat)
-                instructions = "You are now the goat! Press E to throw rocks. Survive for 1 minute!";
+                instructions = "You are now the goat! Press E to throw rocks.";
             
             spriteBatch.DrawString(font, instructions, new Vector2(10, 10), Color.Yellow);
         }
