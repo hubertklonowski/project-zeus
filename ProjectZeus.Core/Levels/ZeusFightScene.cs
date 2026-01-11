@@ -184,11 +184,11 @@ namespace ProjectZeus.Core
 
             playerVelocity = new Vector2(playerVelocity.X, playerVelocity.Y + 900f * dt);
             
-            // Handle item selection with arrow keys
-            bool leftArrowPressed = keyboardState.IsKeyDown(Keys.Left) && !previousKeyState.IsKeyDown(Keys.Left);
-            bool rightArrowPressed = keyboardState.IsKeyDown(Keys.Right) && !previousKeyState.IsKeyDown(Keys.Right);
+            // Handle item selection with Q/E keys (Q = previous, E = next)
+            bool qKeyPressed = keyboardState.IsKeyDown(Keys.Q) && !previousKeyState.IsKeyDown(Keys.Q);
+            bool eKeyPressed = keyboardState.IsKeyDown(Keys.E) && !previousKeyState.IsKeyDown(Keys.E);
             
-            if (leftArrowPressed)
+            if (qKeyPressed)
             {
                 // Cycle backwards: Mountain <- Mine <- Maze <- None <- Mountain
                 if (currentPlacedItem == PillarItemType.None)
@@ -201,7 +201,7 @@ namespace ProjectZeus.Core
                     currentPlacedItem = PillarItemType.None;
             }
             
-            if (rightArrowPressed)
+            if (eKeyPressed)
             {
                 // Cycle forwards: None -> Mountain -> Mine -> Maze -> None
                 if (currentPlacedItem == PillarItemType.None)
@@ -396,7 +396,7 @@ namespace ProjectZeus.Core
             }
             else if (!zeusAngry)
             {
-                string instruction = "Use arrow keys to select item, ENTER to confirm";
+                string instruction = "Use Q/E keys to select item, ENTER to confirm";
                 Vector2 textSize = titleFont.MeasureString(instruction);
                 Vector2 textPos = new Vector2((baseScreenSize.X - textSize.X) / 2f, 20);
                 spriteBatch.DrawString(titleFont, instruction, textPos, Color.Yellow);
