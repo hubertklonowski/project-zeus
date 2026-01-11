@@ -6,6 +6,7 @@ using Microsoft.Xna.Framework.Input;
 using ProjectZeus.Core.Entities;
 using ProjectZeus.Core.Rendering;
 using ProjectZeus.Core.Levels;
+using ProjectZeus.Core.Constants;
 using MonoGame.Aseprite;
 
 namespace ProjectZeus.Core
@@ -17,28 +18,55 @@ namespace ProjectZeus.Core
     {
         public bool IsCompleted { get; private set; }
         public bool ShouldRestartGame { get; private set; }
+        public bool PlayerTransformedToGoat { get; private set; }
 
         private readonly Vector2 baseScreenSize = new Vector2(800, 480);
         private Texture2D solidTexture;
         private SpriteFont titleFont;
         private AsepriteSprite zeusSprite;
+        private AsepriteSprite goatSprite;
         
         private Vector2 zeusPosition;
         private Vector2 sacrificePillarPosition;
         private Vector2 sacrificePillarSize = new Vector2(80, 100);
         
-        // Zeus dialogue state
-        private string[] zeusDialogueOptions = { "κρι-κρι", "χρυσός του Μίδα", "κρασί του Διονύσου" };
-        private PillarItemType[] expectedItems = { PillarItemType.Mountain, PillarItemType.Mine, PillarItemType.Maze };
+        // Zeus dialogue state - mapping of dialogue to expected item
+        private struct DialogueMapping
+        {
+            public string Dialogue;
+            public PillarItemType ExpectedItem;
+            
+            public DialogueMapping(string dialogue, PillarItemType expectedItem)
+            {
+                Dialogue = dialogue;
+                ExpectedItem = expectedItem;
+            }
+        }
+        
+        private DialogueMapping[] dialogueMappings = new[]
+        {
+            new DialogueMapping("κρι-κρι", PillarItemType.Mountain),
+            new DialogueMapping("χρυσός του Μίδα", PillarItemType.Mine),
+            new DialogueMapping("κρασί του Διονύσου", PillarItemType.Maze)
+        };
+        
         private int currentDialogueIndex = 0;
         private PillarItemType currentPlacedItem = PillarItemType.None;
         private int correctAnswers = 0;
-        private bool waitingForItem = true;
+        
+        // Timer state
+        private const float timeLimit = 10f;
+        private float remainingTime = timeLimit;
+        private bool timerActive = false;
         
         // Zeus animation state
         private bool zeusAngry = false;
         private float angryAnimationTime = 0f;
-        private const float stompDuration = 2f;
+        private const float laughDuration = 3f;
+        private string zeusLaughText = "Χα χα χα!"; // "Ha ha ha!" in Greek
+        
+        // Player transformation state
+        private bool playerTransformedToGoat = false;
         
         // Victory state
         private bool victoryAchieved = false;
@@ -62,6 +90,9 @@ namespace ProjectZeus.Core
             // Load Zeus sprite
             zeusSprite = AsepriteSprite.Load(graphicsDevice, "Content/Sprites/zus.aseprite");
             
+            // Load goat sprite for transformation
+            goatSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Goat);
+            
             // Position Zeus on the left side of the screen, standing on ground
             float groundTop = baseScreenSize.Y * 0.7f; // This is where ground starts (y = 336)
             float zeusMarginFromLeft = 40f;
@@ -78,43 +109,59 @@ namespace ProjectZeus.Core
             
             // Randomize the order of dialogues
             ShuffleDialogues();
+            
+            // Start timer when first dialogue shows
+            timerActive = true;
+            remainingTime = timeLimit;
         }
         
         private void ShuffleDialogues()
         {
             Random rng = new Random();
-            int n = zeusDialogueOptions.Length;
+            int n = dialogueMappings.Length;
             while (n > 1)
             {
                 n--;
                 int k = rng.Next(n + 1);
-                // Swap dialogues
-                string tempDialogue = zeusDialogueOptions[k];
-                zeusDialogueOptions[k] = zeusDialogueOptions[n];
-                zeusDialogueOptions[n] = tempDialogue;
-                // Swap expected items
-                PillarItemType tempItem = expectedItems[k];
-                expectedItems[k] = expectedItems[n];
-                expectedItems[n] = tempItem;
+                // Swap dialogue mappings
+                DialogueMapping temp = dialogueMappings[k];
+                dialogueMappings[k] = dialogueMappings[n];
+                dialogueMappings[n] = temp;
             }
         }
 
-        public (Vector2 velocity, bool isOnGround) Update(GameTime gameTime, KeyboardState keyboardState, Vector2 playerPosition, Vector2 playerSize, Vector2 playerVelocity, bool playerIsOnGround)
+        public (Vector2 velocity, bool isOnGround, bool transformedToGoat) Update(GameTime gameTime, KeyboardState keyboardState, Vector2 playerPosition, Vector2 playerSize, Vector2 playerVelocity, bool playerIsOnGround)
         {
             if (victoryAchieved)
             {
                 IsCompleted = true;
-                return (playerVelocity, playerIsOnGround);
+                return (playerVelocity, playerIsOnGround, playerTransformedToGoat);
             }
             
             if (zeusAngry)
             {
                 angryAnimationTime += (float)gameTime.ElapsedGameTime.TotalSeconds;
-                if (angryAnimationTime >= stompDuration)
+                if (angryAnimationTime >= laughDuration)
                 {
                     ShouldRestartGame = true;
                 }
-                return (playerVelocity, playerIsOnGround);
+                return (Vector2.Zero, playerIsOnGround, playerTransformedToGoat);
+            }
+            
+            // Update timer
+            if (timerActive)
+            {
+                remainingTime -= (float)gameTime.ElapsedGameTime.TotalSeconds;
+                if (remainingTime <= 0)
+                {
+                    // Time's up! Wrong answer
+                    zeusAngry = true;
+                    playerTransformedToGoat = true;
+                    PlayerTransformedToGoat = true;
+                    angryAnimationTime = 0f;
+                    timerActive = false;
+                    return (Vector2.Zero, playerIsOnGround, playerTransformedToGoat);
+                }
             }
             
             // Apply physics to player
@@ -129,7 +176,7 @@ namespace ProjectZeus.Core
 
             playerVelocity = new Vector2(move * 180f, playerVelocity.Y);
 
-            if (playerIsOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up)))
+            if (playerIsOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up) || keyboardState.IsKeyDown(Keys.W)))
             {
                 playerVelocity = new Vector2(playerVelocity.X, -560f);
                 playerIsOnGround = false;
@@ -137,50 +184,52 @@ namespace ProjectZeus.Core
 
             playerVelocity = new Vector2(playerVelocity.X, playerVelocity.Y + 900f * dt);
             
-            // Check if waiting for item placement
-            if (waitingForItem)
+            // Handle item selection with arrow keys
+            bool leftArrowPressed = keyboardState.IsKeyDown(Keys.Left) && !previousKeyState.IsKeyDown(Keys.Left);
+            bool rightArrowPressed = keyboardState.IsKeyDown(Keys.Right) && !previousKeyState.IsKeyDown(Keys.Right);
+            
+            if (leftArrowPressed)
             {
-                bool eKeyPressed = keyboardState.IsKeyDown(Keys.E) && !previousKeyState.IsKeyDown(Keys.E);
-                
-                if (eKeyPressed)
-                {
-                    // Check if player is near sacrifice pillar
-                    Rectangle playerRect = new Rectangle((int)playerPosition.X, (int)playerPosition.Y, (int)playerSize.X, (int)playerSize.Y);
-                    Rectangle pillarRect = new Rectangle((int)sacrificePillarPosition.X, (int)sacrificePillarPosition.Y, 
-                        (int)sacrificePillarSize.X, (int)sacrificePillarSize.Y);
-                    pillarRect.Inflate(30, 30);
-                    
-                    if (playerRect.Intersects(pillarRect))
-                    {
-                        // Cycle through items: None -> Mountain -> Mine -> Maze -> None
-                        if (currentPlacedItem == PillarItemType.None)
-                            currentPlacedItem = PillarItemType.Mountain;
-                        else if (currentPlacedItem == PillarItemType.Mountain)
-                            currentPlacedItem = PillarItemType.Mine;
-                        else if (currentPlacedItem == PillarItemType.Mine)
-                            currentPlacedItem = PillarItemType.Maze;
-                        else
-                            currentPlacedItem = PillarItemType.None;
-                    }
-                }
-                
-                // Check if player confirms the item (press E away from pillar or second E press)
-                bool confirmPressed = keyboardState.IsKeyDown(Keys.Enter) && !previousKeyState.IsKeyDown(Keys.Enter);
-                
-                if (confirmPressed && currentPlacedItem != PillarItemType.None)
-                {
-                    ValidateSacrifice();
-                }
+                // Cycle backwards: Mountain <- Mine <- Maze <- None <- Mountain
+                if (currentPlacedItem == PillarItemType.None)
+                    currentPlacedItem = PillarItemType.Mountain;
+                else if (currentPlacedItem == PillarItemType.Mountain)
+                    currentPlacedItem = PillarItemType.Maze;
+                else if (currentPlacedItem == PillarItemType.Maze)
+                    currentPlacedItem = PillarItemType.Mine;
+                else if (currentPlacedItem == PillarItemType.Mine)
+                    currentPlacedItem = PillarItemType.None;
+            }
+            
+            if (rightArrowPressed)
+            {
+                // Cycle forwards: None -> Mountain -> Mine -> Maze -> None
+                if (currentPlacedItem == PillarItemType.None)
+                    currentPlacedItem = PillarItemType.Mountain;
+                else if (currentPlacedItem == PillarItemType.Mountain)
+                    currentPlacedItem = PillarItemType.Mine;
+                else if (currentPlacedItem == PillarItemType.Mine)
+                    currentPlacedItem = PillarItemType.Maze;
+                else if (currentPlacedItem == PillarItemType.Maze)
+                    currentPlacedItem = PillarItemType.None;
+            }
+            
+            // Check if player confirms the item
+            bool confirmPressed = keyboardState.IsKeyDown(Keys.Enter) && !previousKeyState.IsKeyDown(Keys.Enter);
+            
+            if (confirmPressed && currentPlacedItem != PillarItemType.None)
+            {
+                ValidateSacrifice();
             }
             
             previousKeyState = keyboardState;
             
-            return (playerVelocity, playerIsOnGround);
+            return (playerVelocity, playerIsOnGround, playerTransformedToGoat);
         }
         
         private void ValidateSacrifice()
         {
-            PillarItemType expectedItem = expectedItems[currentDialogueIndex];
+            PillarItemType expectedItem = dialogueMappings[currentDialogueIndex].ExpectedItem;
             
             if (currentPlacedItem == expectedItem)
             {
@@ -192,23 +241,28 @@ namespace ProjectZeus.Core
                 {
                     // Victory!
                     victoryAchieved = true;
+                    timerActive = false;
                 }
                 else
                 {
-                    // Move to next dialogue
+                    // Move to next dialogue and reset timer
                     currentDialogueIndex++;
-                    waitingForItem = true;
+                    remainingTime = timeLimit;
+                    timerActive = true;
                 }
             }
             else
             {
-                // Wrong item - Zeus gets angry
+                // Wrong item - Zeus gets angry and laughs
                 zeusAngry = true;
+                playerTransformedToGoat = true;
+                PlayerTransformedToGoat = true;
                 angryAnimationTime = 0f;
+                timerActive = false;
             }
         }
 
-        public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, AdonisPlayer player, GameTime gameTime)
+        public void Draw(SpriteBatch spriteBatch, GraphicsDevice graphicsDevice, AdonisPlayer player, GameTime gameTime, bool playerIsGoat)
         {
             graphicsDevice.Clear(new Color(20, 30, 80));
 
@@ -226,34 +280,36 @@ namespace ProjectZeus.Core
             // Draw sacrifice pillar with spotlight
             DrawSacrificePillar(spriteBatch, gameTime);
 
-            // Draw Zeus using sprite or fallback
+            // Draw Zeus using zus.aseprite sprite
             if (zeusSprite != null && zeusSprite.IsLoaded)
             {
-                // Zeus is moving if angry (stomping)
+                // Zeus is moving/animated when angry (laughing)
                 bool isMoving = zeusAngry;
-                Color zeusColor = zeusAngry ? Color.Red : Color.White;
-                zeusSprite.Draw(spriteBatch, zeusPosition, isMoving, gameTime, zeusColor, 10f, SpriteEffects.None);
+                zeusSprite.Draw(spriteBatch, zeusPosition, isMoving, gameTime, Color.White, 10f, SpriteEffects.None);
+            }
+            
+            // Draw Zeus dialogue bubble or laugh
+            if (!victoryAchieved)
+            {
+                if (zeusAngry)
+                {
+                    DrawDialogueBubble(spriteBatch, zeusLaughText);
+                }
+                else if (currentDialogueIndex < dialogueMappings.Length)
+                {
+                    DrawDialogueBubble(spriteBatch, dialogueMappings[currentDialogueIndex].Dialogue);
+                }
+            }
+
+            // Draw player or goat
+            if (playerIsGoat && goatSprite != null && goatSprite.IsLoaded)
+            {
+                goatSprite.Draw(spriteBatch, player.Position, false, gameTime, Color.White, 10f, SpriteEffects.None);
             }
             else
             {
-                // Fallback rendering - use actual sprite size if available
-                Vector2 zeusSize = zeusSprite?.IsLoaded == true ? zeusSprite.Size : new Vector2(80, 120);
-                Rectangle zeusRect = new Rectangle(
-                    (int)zeusPosition.X,
-                    (int)zeusPosition.Y,
-                    (int)zeusSize.X,
-                    (int)zeusSize.Y);
-                Color zeusColor = zeusAngry ? Color.Red : new Color(220, 220, 240);
-                spriteBatch.Draw(solidTexture, zeusRect, zeusColor);
+                player.Draw(gameTime, spriteBatch);
             }
-            
-            // Draw Zeus dialogue bubble
-            if (!victoryAchieved && !zeusAngry && currentDialogueIndex < zeusDialogueOptions.Length)
-            {
-                DrawDialogueBubble(spriteBatch, zeusDialogueOptions[currentDialogueIndex]);
-            }
-
-            player.Draw(gameTime, spriteBatch);
             
             // Draw UI
             DrawUI(spriteBatch);
@@ -290,7 +346,7 @@ namespace ProjectZeus.Core
                 30);
             spriteBatch.Draw(solidTexture, slotRect, new Color(200, 200, 220));
             
-            // Draw current item if placed
+            // Draw current item if selected (always visible on altar)
             if (currentPlacedItem != PillarItemType.None)
             {
                 Color itemColor = currentPlacedItem == PillarItemType.Mountain ? Color.Gold :
@@ -340,9 +396,7 @@ namespace ProjectZeus.Core
             }
             else if (!zeusAngry)
             {
-                string instruction = currentPlacedItem == PillarItemType.None 
-                    ? "Press E near pillar to cycle items (Gold/Blue/Purple)" 
-                    : "Press ENTER to confirm sacrifice";
+                string instruction = "Use arrow keys to select item, ENTER to confirm";
                 Vector2 textSize = titleFont.MeasureString(instruction);
                 Vector2 textPos = new Vector2((baseScreenSize.X - textSize.X) / 2f, 20);
                 spriteBatch.DrawString(titleFont, instruction, textPos, Color.Yellow);
@@ -357,7 +411,37 @@ namespace ProjectZeus.Core
                     Vector2 itemTextPos = new Vector2((baseScreenSize.X - itemTextSize.X) / 2f, 45);
                     spriteBatch.DrawString(titleFont, itemName, itemTextPos, Color.White);
                 }
+                
+                // Show countdown timer in Greek
+                if (timerActive)
+                {
+                    string greekTime = ConvertToGreekNumber((int)Math.Ceiling(remainingTime));
+                    Vector2 timerTextSize = titleFont.MeasureString(greekTime);
+                    Vector2 timerTextPos = new Vector2((baseScreenSize.X - timerTextSize.X) / 2f, baseScreenSize.Y - 50);
+                    Color timerColor = remainingTime <= 3f ? Color.Red : Color.White;
+                    spriteBatch.DrawString(titleFont, greekTime, timerTextPos, timerColor);
+                }
             }
+        }
+        
+        private string ConvertToGreekNumber(int number)
+        {
+            // Convert numbers to Greek words
+            return number switch
+            {
+                10 => "δέκα",
+                9 => "εννέα",
+                8 => "οκτώ",
+                7 => "επτά",
+                6 => "έξι",
+                5 => "πέντε",
+                4 => "τέσσερα",
+                3 => "τρία",
+                2 => "δύο",
+                1 => "ένα",
+                0 => "μηδέν",
+                _ => number.ToString()
+            };
         }
     }
 }

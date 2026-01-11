@@ -369,28 +369,31 @@ namespace ProjectZeus.Core
             Vector2 playerSize = player.Size;
 
             // Update Zeus fight scene with player state
-            var (newVelocity, newIsOnGround) = sceneManager.ZeusFightScene.Update(
+            var (newVelocity, newIsOnGround, transformedToGoat) = sceneManager.ZeusFightScene.Update(
                 gameTime, keyboardState, player.Position, playerSize, player.Velocity, player.IsOnGround);
             
             player.Velocity = newVelocity;
             player.IsOnGround = newIsOnGround;
 
-            // Apply position updates
-            player.Position += player.Velocity * dt;
-
-            // Ground collision
-            player.IsOnGround = false;
-            if (player.Position.Y + playerSize.Y >= groundTop)
+            // Apply position updates (don't move if transformed to goat)
+            if (!transformedToGoat)
             {
-                player.Position = new Vector2(player.Position.X, groundTop - playerSize.Y);
-                player.Velocity = new Vector2(player.Velocity.X, 0f);
-                player.IsOnGround = true;
-            }
+                player.Position += player.Velocity * dt;
 
-            // Clamp player to screen bounds
-            Vector2 tempPos = player.Position;
-            Physics.PlatformerPhysics.ClampToScreen(ref tempPos, playerSize);
-            player.Position = tempPos;
+                // Ground collision
+                player.IsOnGround = false;
+                if (player.Position.Y + playerSize.Y >= groundTop)
+                {
+                    player.Position = new Vector2(player.Position.X, groundTop - playerSize.Y);
+                    player.Velocity = new Vector2(player.Velocity.X, 0f);
+                    player.IsOnGround = true;
+                }
+
+                // Clamp player to screen bounds
+                Vector2 tempPos = player.Position;
+                Physics.PlatformerPhysics.ClampToScreen(ref tempPos, playerSize);
+                player.Position = tempPos;
+            }
             
             player.Update(gameTime);
 
@@ -440,7 +443,7 @@ namespace ProjectZeus.Core
             switch (sceneManager.CurrentScene)
             {
                 case SceneManager.GameScene.ZeusFight:
-                    sceneManager.ZeusFightScene.Draw(spriteBatch, GraphicsDevice, player, gameTime);
+                    sceneManager.ZeusFightScene.Draw(spriteBatch, GraphicsDevice, player, gameTime, sceneManager.ZeusFightScene.PlayerTransformedToGoat);
                     break;
 
                 case SceneManager.GameScene.MazeLevel:
