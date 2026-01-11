@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 using ProjectZeus.Core.Entities;
 using ProjectZeus.Core.Rendering;
 
-namespace ProjectZeus.Core.Levels.MineLevel
+namespace ProjectZeus.Core.Levels.Mine
 {
     /// <summary>
     /// Handles rendering for the mine level

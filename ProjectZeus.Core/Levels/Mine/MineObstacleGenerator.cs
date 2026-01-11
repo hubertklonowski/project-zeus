@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework;
 using ProjectZeus.Core.Entities;
 using ProjectZeus.Core.Rendering;
 
-namespace ProjectZeus.Core.Levels.MineLevel
+namespace ProjectZeus.Core.Levels.Mine
 {
     /// <summary>
     /// Generates obstacles for the mine level

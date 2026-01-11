@@ -8,7 +8,7 @@ using ProjectZeus.Core.Entities;
 using ProjectZeus.Core.Rendering;
 using ProjectZeus.Core.Utilities;
 using ProjectZeus.Core.Extensions;
-using ProjectZeus.Core.Levels.MineLevel;
+using ProjectZeus.Core.Levels.Mine;
 
 namespace ProjectZeus.Core.Levels
 {

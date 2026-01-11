@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework.Input;
 using ProjectZeus.Core.Constants;
 using ProjectZeus.Core.Extensions;
 
-namespace ProjectZeus.Core.Levels.MineLevel
+namespace ProjectZeus.Core.Levels.Mine
 {
     /// <summary>
     /// Handles player physics in the mine level

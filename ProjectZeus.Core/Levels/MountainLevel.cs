@@ -419,12 +419,12 @@ namespace ProjectZeus.Core
                 return;
             
             // Create camera transformation matrix
-            Matrix cameraTransform = Matrix.CreateTranslation(-cameraOffset.X, -cameraOffset.Y, 0);
+            Matrix cameraTransform = camera.GetTransform();
             
             spriteBatch.Begin(transformMatrix: cameraTransform);
             
             // Draw sky background (stretched to cover visible area)
-            Rectangle skyRect = new Rectangle(0, (int)cameraOffset.Y, (int)baseScreenSize.X, (int)baseScreenSize.Y);
+            Rectangle skyRect = new Rectangle(0, (int)camera.CameraOffset.Y, (int)baseScreenSize.X, (int)baseScreenSize.Y);
             spriteBatch.Draw(solidTexture, skyRect, new Color(135, 206, 235));
             
             // Draw mountain body (triangular shape in background)
@@ -565,7 +565,7 @@ namespace ProjectZeus.Core
         /// </summary>
         public Matrix GetCameraTransform()
         {
-            return Matrix.CreateTranslation(-cameraOffset.X, -cameraOffset.Y, 0);
+            return camera.GetTransform();
         }
         
         private void DrawMountainBackground(SpriteBatch spriteBatch)
@@ -631,7 +631,7 @@ namespace ProjectZeus.Core
             }
             
             // Reset camera to show bottom of level
-            cameraOffset = new Vector2(0, worldHeight - baseScreenSize.Y);
+            camera.SetToBottom();
         }
 
         /// <summary>

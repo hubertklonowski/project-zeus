@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using ProjectZeus.Core.Entities;
 
-namespace ProjectZeus.Core.Levels.MineLevel
+namespace ProjectZeus.Core.Levels.Mine
 {
     /// <summary>
     /// Updates mine level entities (carts, bats, guano, etc.)

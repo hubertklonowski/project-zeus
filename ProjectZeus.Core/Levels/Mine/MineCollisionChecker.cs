@@ -3,7 +3,7 @@ using Microsoft.Xna.Framework;
 using ProjectZeus.Core.Entities;
 using ProjectZeus.Core.Extensions;
 
-namespace ProjectZeus.Core.Levels.MineLevel
+namespace ProjectZeus.Core.Levels.Mine
 {
     /// <summary>
     /// Checks collisions in the mine level
