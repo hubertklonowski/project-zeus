@@ -91,7 +91,7 @@ namespace ProjectZeus.Core
             }
              
             // Handle Zeus stomping after goat transformation
-            if (zeusStomp)
+            if (gameStateManager.ZeusStomp)
             {
                 gameStateManager.UpdateStompAnimation(dt);
 
@@ -111,11 +111,16 @@ namespace ProjectZeus.Core
                         IsCompleted = true;
                         ShouldStartMountainAsGoat = true;
                     }
+                    else if (!zeusIsJumping)
+                    {
+                        gameStateManager.UpdateStompAnimation(0f);
+                    }
                 }
 
                 zeusPosition.X = MathHelper.Clamp(zeusPosition.X, 0f, baseScreenSize.X - zeusSize.X);
             }
             
+            // Update timer
             gameStateManager.UpdateTimer(dt);
             
             float move = keyboardState.GetHorizontalInput();
@@ -142,7 +147,9 @@ namespace ProjectZeus.Core
                 if (qKeyPressed) itemManager.CyclePreviousItem();
                 if (eKeyPressed) itemManager.CycleNextItem();
                 
+                // Check if player confirms the item
                 bool confirmPressed = keyboardState.IsKeyDown(Keys.Enter) && !previousKeyState.IsKeyDown(Keys.Enter);
+                
                 if (confirmPressed && itemManager.CurrentPlacedItem != PillarItemType.None)
                 {
                     gameStateManager.ValidateSacrifice(itemManager.CurrentPlacedItem, itemManager);
