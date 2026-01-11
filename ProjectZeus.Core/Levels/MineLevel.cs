@@ -5,8 +5,10 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using ProjectZeus.Core.Constants;
 using ProjectZeus.Core.Entities;
-using ProjectZeus.Core.Physics;
 using ProjectZeus.Core.Rendering;
+using ProjectZeus.Core.Utilities;
+using ProjectZeus.Core.Extensions;
+using ProjectZeus.Core.Levels.MineLevel;
 
 namespace ProjectZeus.Core.Levels
 {
@@ -17,7 +19,7 @@ namespace ProjectZeus.Core.Levels
     public class MineLevel
     {
         // World dimensions - level spans multiple screens horizontally
-        private const float WorldWidth = 4000f; // 5 screens wide
+        private const float WorldWidth = 4000f;
         private const float GroundHeight = 20f;
         private const float ScreenWidth = 800f;
         private const float ScreenHeight = 480f;
@@ -26,7 +28,7 @@ namespace ProjectZeus.Core.Levels
         private const float CartSpeed = 120f;
         
         // Cart spawning for return trip
-        private const float CartSpawnInterval = 2.5f; // Seconds between cart spawns during return
+        private const float CartSpawnInterval = 2.5f;
         private float cartSpawnTimer;
         
         // Player state
@@ -35,7 +37,7 @@ namespace ProjectZeus.Core.Levels
         private bool playerOnGround;
         
         // Camera
-        private Vector2 cameraOffset;
+        private CameraController camera;
         
         // Ground
         private Rectangle groundRect;
@@ -58,6 +60,9 @@ namespace ProjectZeus.Core.Levels
         private Texture2D solidTexture;
         private SpriteFont font;
         
+        // Renderer
+        private MineRenderer renderer;
+        
         // Sprites
         private AsepriteSprite cartSprite;
         private AsepriteSprite stalactiteSprite;
@@ -77,7 +82,7 @@ namespace ProjectZeus.Core.Levels
         /// </summary>
         public Matrix GetCameraTransform()
         {
-            return Matrix.CreateTranslation(-cameraOffset.X, -cameraOffset.Y, 0);
+            return camera.GetTransform();
         }
 
         public MineLevel()
@@ -88,12 +93,14 @@ namespace ProjectZeus.Core.Levels
             guanos = new List<Guano>();
             random = new Random();
             IsActive = false;
+            camera = new CameraController(ScreenWidth, ScreenHeight, WorldWidth, ScreenHeight);
         }
 
         public void LoadContent(GraphicsDevice graphicsDevice, SpriteFont font)
         {
             this.font = font;
             solidTexture = DrawingHelpers.CreateSolidTexture(graphicsDevice, 1, 1, Color.White);
+            renderer = new MineRenderer(solidTexture);
             
             // Load sprites
             cartSprite = AsepriteSprite.Load(graphicsDevice, AssetPaths.Cart);
@@ -116,7 +123,7 @@ namespace ProjectZeus.Core.Levels
             playerOnGround = true;
             
             // Initialize camera at start
-            cameraOffset = Vector2.Zero;
+            camera.Reset();
             
             // Setup ground
             groundRect = new Rectangle(0, (int)(ScreenHeight - GroundHeight), (int)WorldWidth, (int)GroundHeight);
@@ -243,17 +250,12 @@ namespace ProjectZeus.Core.Levels
 
             float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
             
-            // Player horizontal movement (player controls their movement)
-            float move = 0f;
-            if (keyboardState.IsKeyDown(Keys.Left) || keyboardState.IsKeyDown(Keys.A))
-                move -= 1f;
-            if (keyboardState.IsKeyDown(Keys.Right) || keyboardState.IsKeyDown(Keys.D))
-                move += 1f;
-            
+            // Player horizontal movement using extension method
+            float move = keyboardState.GetHorizontalInput();
             playerVelocity.X = move * GameConstants.MoveSpeed;
             
-            // Jump input
-            if (playerOnGround && (keyboardState.IsKeyDown(Keys.Space) || keyboardState.IsKeyDown(Keys.Up) || keyboardState.IsKeyDown(Keys.W)))
+            // Jump input using extension method
+            if (playerOnGround && keyboardState.IsJumpPressed())
             {
                 playerVelocity.Y = GameConstants.JumpVelocity;
                 playerOnGround = false;
@@ -282,8 +284,8 @@ namespace ProjectZeus.Core.Levels
                 playerOnGround = true;
             }
             
-            // Update camera to follow player (only moves when player moves)
-            UpdateCamera();
+            // Update camera to follow player
+            camera.FollowPlayerHorizontal(playerPosition);
             
             // Update carts - they move toward the player on tracks
             for (int i = carts.Count - 1; i >= 0; i--)
@@ -327,8 +329,8 @@ namespace ProjectZeus.Core.Levels
                 bat.Position += bat.Velocity * deltaTime;
                 
                 // Keep bats in the jump zone (where player can reach them)
-                float minBatY = groundTop - 200f; // Top of jump zone
-                float maxBatY = groundTop - 60f;  // Just above ground
+                float minBatY = groundTop - 200f;
+                float maxBatY = groundTop - 60f;
                 
                 if (bat.Position.Y < minBatY)
                 {
@@ -342,17 +344,12 @@ namespace ProjectZeus.Core.Levels
                 }
             }
 
-            // Check collision with carts
-            Rectangle playerRect = new Rectangle(
-                (int)playerPosition.X, 
-                (int)playerPosition.Y, 
-                (int)GameConstants.PlayerSize.X, 
-                (int)GameConstants.PlayerSize.Y);
+            // Check collision with carts using extension method
+            Rectangle playerRect = playerPosition.ToRectangle(GameConstants.PlayerSize);
             
             foreach (var cart in carts)
             {
-                Rectangle cartRect = cart.Bounds;
-                if (playerRect.Intersects(cartRect))
+                if (playerRect.IntersectsWith(cart.Bounds))
                 {
                     PlayerDied = true;
                     return;
@@ -362,13 +359,7 @@ namespace ProjectZeus.Core.Levels
             // Check collision with stalactites
             foreach (var stalactite in stalactites)
             {
-                Rectangle stalactiteRect = new Rectangle(
-                    (int)stalactite.Position.X,
-                    (int)stalactite.Position.Y,
-                    (int)stalactite.Size.X,
-                    (int)stalactite.Size.Y);
-                    
-                if (playerRect.Intersects(stalactiteRect))
+                if (playerRect.IntersectsWith(stalactite.Position, stalactite.Size))
                 {
                     PlayerDied = true;
                     return;
@@ -378,7 +369,7 @@ namespace ProjectZeus.Core.Levels
             // Check collision with bats
             foreach (var bat in bats)
             {
-                if (playerRect.Intersects(bat.Bounds))
+                if (playerRect.IntersectsWith(bat.Bounds))
                 {
                     PlayerDied = true;
                     return;
@@ -397,12 +388,12 @@ namespace ProjectZeus.Core.Levels
                     guanos.Add(new Guano
                     {
                         Position = gigaBat.Position,
-                        Velocity = new Vector2(0, 200f) // Falls downward
+                        Velocity = new Vector2(0, 200f)
                     });
                 }
                 
                 // Check collision with GigaBat
-                if (playerRect.Intersects(gigaBat.Bounds))
+                if (playerRect.IntersectsWith(gigaBat.Bounds))
                 {
                     PlayerDied = true;
                     return;
@@ -423,19 +414,17 @@ namespace ProjectZeus.Core.Levels
                 }
                 
                 // Check collision with player
-                if (playerRect.Intersects(guano.Bounds))
+                if (playerRect.IntersectsWith(guano.Bounds))
                 {
                     PlayerDied = true;
                     return;
                 }
             }
 
-            // Check if player reached the item
-            if (!itemCollected && keyboardState.IsKeyDown(Keys.E) && !previousKeyboardState.IsKeyDown(Keys.E))
+            // Check if player reached the item using extension method
+            if (!itemCollected && keyboardState.WasActionPressed(previousKeyboardState))
             {
-                Rectangle expandedItemRect = itemRect;
-                expandedItemRect.Inflate(20, 20);
-                if (playerRect.Intersects(expandedItemRect))
+                if (CollisionExtensions.CheckPickupCollision(playerRect, itemRect))
                 {
                     itemCollected = true;
                     HasCollectedItem = true;
@@ -451,26 +440,12 @@ namespace ProjectZeus.Core.Levels
             }
         }
         
-        private void UpdateCamera()
-        {
-            // Camera follows player, keeping them roughly centered horizontally
-            // but only moves when player moves past certain thresholds
-            float targetCameraX = playerPosition.X - ScreenWidth * 0.3f;
-            
-            // Clamp camera to world bounds
-            targetCameraX = MathHelper.Clamp(targetCameraX, 0, WorldWidth - ScreenWidth);
-            
-            // Smooth camera follow
-            cameraOffset.X = MathHelper.Lerp(cameraOffset.X, targetCameraX, 0.1f);
-            cameraOffset.Y = 0; // No vertical scrolling
-        }
-        
         private void SpawnReturnCart()
         {
             float groundTop = ScreenHeight - GroundHeight;
             
             // Spawn cart just off the right side of the visible screen
-            float spawnX = cameraOffset.X + ScreenWidth + 50f;
+            float spawnX = camera.CameraOffset.X + ScreenWidth + 50f;
             
             // Only spawn if not too far into the level (player is returning)
             if (spawnX < WorldWidth)
@@ -494,34 +469,37 @@ namespace ProjectZeus.Core.Levels
             // Clear to dark mine color
             graphicsDevice.Clear(new Color(20, 15, 30));
             
-            // Draw background
-            DrawBackground(spriteBatch);
+            float cameraOffsetX = camera.CameraOffset.X;
+            
+            // Draw background using renderer
+            renderer.DrawBackground(spriteBatch, cameraOffsetX, ScreenWidth, ScreenHeight);
             
             // Draw ceiling (top of screen)
-            Rectangle ceilingRect = new Rectangle((int)cameraOffset.X, 0, (int)ScreenWidth + 100, 30);
+            Rectangle ceilingRect = new Rectangle((int)cameraOffsetX, 0, (int)ScreenWidth + 100, 30);
             spriteBatch.Draw(solidTexture, ceilingRect, new Color(60, 50, 40));
             
             // Draw stalactites
             foreach (var stalactite in stalactites)
             {
-                if (stalactite.Position.X >= cameraOffset.X - 50 && 
-                    stalactite.Position.X <= cameraOffset.X + ScreenWidth + 50)
+                if (stalactite.Position.X >= cameraOffsetX - 50 && 
+                    stalactite.Position.X <= cameraOffsetX + ScreenWidth + 50)
                 {
-                    stalactite.Draw(spriteBatch, solidTexture, gameTime);
+                    stalactite.Draw(spriteBatch, gameTime);
                 }
             }
             
             // Draw ground
             spriteBatch.Draw(solidTexture, groundRect, new Color(80, 70, 60));
             
-            // Draw rails on ground (where carts drive)
-            DrawRails(spriteBatch);
+            // Draw rails using renderer
+            float groundTop = ScreenHeight - GroundHeight;
+            renderer.DrawRails(spriteBatch, groundTop, WorldWidth, cameraOffsetX, ScreenWidth);
             
             // Draw carts (on the rails)
             foreach (var cart in carts)
             {
-                if (cart.Position.X >= cameraOffset.X - 100 && 
-                    cart.Position.X <= cameraOffset.X + ScreenWidth + 100)
+                if (cart.Position.X >= cameraOffsetX - 100 && 
+                    cart.Position.X <= cameraOffsetX + ScreenWidth + 100)
                 {
                     cart.Draw(spriteBatch, solidTexture, gameTime);
                 }
@@ -530,16 +508,16 @@ namespace ProjectZeus.Core.Levels
             // Draw bats
             foreach (var bat in bats)
             {
-                if (bat.Position.X >= cameraOffset.X - 50 && 
-                    bat.Position.X <= cameraOffset.X + ScreenWidth + 50)
+                if (bat.Position.X >= cameraOffsetX - 50 && 
+                    bat.Position.X <= cameraOffsetX + ScreenWidth + 50)
                 {
                     bat.Draw(spriteBatch, solidTexture, gameTime);
                 }
             }
             
             // Draw GigaBat
-            if (gigaBat != null && gigaBat.Position.X >= cameraOffset.X - 100 && 
-                gigaBat.Position.X <= cameraOffset.X + ScreenWidth + 100)
+            if (gigaBat != null && gigaBat.Position.X >= cameraOffsetX - 100 && 
+                gigaBat.Position.X <= cameraOffsetX + ScreenWidth + 100)
             {
                 gigaBat.Draw(spriteBatch, solidTexture, gameTime);
             }
@@ -547,16 +525,16 @@ namespace ProjectZeus.Core.Levels
             // Draw guano projectiles
             foreach (var guano in guanos)
             {
-                if (guano.Position.X >= cameraOffset.X - 50 && 
-                    guano.Position.X <= cameraOffset.X + ScreenWidth + 50)
+                if (guano.Position.X >= cameraOffsetX - 50 && 
+                    guano.Position.X <= cameraOffsetX + ScreenWidth + 50)
                 {
                     guano.Draw(spriteBatch, solidTexture);
                 }
             }
             
             // Draw item if not collected
-            if (!itemCollected && itemRect.X >= cameraOffset.X - 50 && 
-                itemRect.X <= cameraOffset.X + ScreenWidth + 50)
+            if (!itemCollected && itemRect.X >= cameraOffsetX - 50 && 
+                itemRect.X <= cameraOffsetX + ScreenWidth + 50)
             {
                 spriteBatch.Draw(solidTexture, itemRect, Color.Gold);
                 Rectangle glowRect = itemRect;
@@ -566,8 +544,8 @@ namespace ProjectZeus.Core.Levels
             
             // Draw exit portal if active (after collecting item)
             if (exitPortal != null && exitPortal.IsActive && 
-                exitPortal.Position.X >= cameraOffset.X - 100 && 
-                exitPortal.Position.X <= cameraOffset.X + ScreenWidth + 100)
+                exitPortal.Position.X >= cameraOffsetX - 100 && 
+                exitPortal.Position.X <= cameraOffsetX + ScreenWidth + 100)
             {
                 DrawingHelpers.DrawPortal(spriteBatch, portalTexture, exitPortal.Bounds, gameTime, exitPortal.BaseColor);
             }
@@ -575,81 +553,8 @@ namespace ProjectZeus.Core.Levels
             // Draw player
             player.Draw(gameTime, spriteBatch);
             
-            // Draw torches at intervals for atmosphere (decoration only)
-            DrawTorches(spriteBatch, gameTime);
-        }
-        
-        private void DrawBackground(SpriteBatch spriteBatch)
-        {
-            // Draw dark background
-            Rectangle bgRect = new Rectangle((int)cameraOffset.X, 0, (int)ScreenWidth + 100, (int)ScreenHeight);
-            spriteBatch.Draw(solidTexture, bgRect, new Color(20, 15, 30));
-            
-            // Draw some background rock texture variation
-            for (int x = (int)(cameraOffset.X / 200) * 200; x < cameraOffset.X + ScreenWidth + 200; x += 200)
-            {
-                // Darker patches for depth
-                int patchY = 100 + (x / 200 % 3) * 80;
-                Rectangle patch = new Rectangle(x, patchY, 150, 100);
-                spriteBatch.Draw(solidTexture, patch, new Color(15, 10, 25));
-            }
-        }
-        
-        private void DrawRails(SpriteBatch spriteBatch)
-        {
-            float groundTop = ScreenHeight - GroundHeight;
-            
-            // Draw two parallel rails
-            int railY1 = (int)(groundTop - 8);
-            int railY2 = (int)(groundTop - 3);
-            
-            // Left rail
-            Rectangle leftRail = new Rectangle(0, railY1, (int)WorldWidth, 3);
-            spriteBatch.Draw(solidTexture, leftRail, new Color(100, 100, 110));
-            
-            // Right rail  
-            Rectangle rightRail = new Rectangle(0, railY2, (int)WorldWidth, 3);
-            spriteBatch.Draw(solidTexture, rightRail, new Color(100, 100, 110));
-            
-            // Draw rail ties (wooden planks across the rails)
-            for (int x = 0; x < WorldWidth; x += 25)
-            {
-                if (x >= cameraOffset.X - 30 && x <= cameraOffset.X + ScreenWidth + 30)
-                {
-                    Rectangle tie = new Rectangle(x, railY1 - 2, 15, 12);
-                    spriteBatch.Draw(solidTexture, tie, new Color(101, 67, 33));
-                }
-            }
-        }
-        
-        private void DrawTorches(SpriteBatch spriteBatch, GameTime gameTime)
-        {
-            float flickerTime = (float)gameTime.TotalGameTime.TotalSeconds;
-            float groundTop = ScreenHeight - GroundHeight;
-            
-            // Draw torches every 300 pixels (decoration only, mounted on ground level)
-            for (int x = 100; x < WorldWidth; x += 300)
-            {
-                if (x >= cameraOffset.X - 50 && x <= cameraOffset.X + ScreenWidth + 50)
-                {
-                    // Torch post standing on ground
-                    Rectangle torchPost = new Rectangle(x, (int)(groundTop - 45), 8, 45);
-                    spriteBatch.Draw(solidTexture, torchPost, new Color(101, 67, 33));
-                    
-                    // Torch holder/bracket at top
-                    Rectangle bracket = new Rectangle(x - 3, (int)(groundTop - 50), 14, 8);
-                    spriteBatch.Draw(solidTexture, bracket, new Color(80, 50, 25));
-                    
-                    // Flame with flicker
-                    float flicker = (float)Math.Sin(flickerTime * 8f + x * 0.1f) * 0.2f + 0.8f;
-                    Rectangle flame = new Rectangle(x - 4, (int)(groundTop - 65), 16, 15);
-                    spriteBatch.Draw(solidTexture, flame, new Color((byte)(255 * flicker), (byte)(200 * flicker), 50));
-                    
-                    // Inner flame (brighter)
-                    Rectangle innerFlame = new Rectangle(x - 1, (int)(groundTop - 62), 10, 10);
-                    spriteBatch.Draw(solidTexture, innerFlame, new Color((byte)(255 * flicker), (byte)(255 * flicker), 100));
-                }
-            }
+            // Draw torches using renderer
+            renderer.DrawTorches(spriteBatch, gameTime, groundTop, WorldWidth, cameraOffsetX, ScreenWidth);
         }
         
         /// <summary>
@@ -683,7 +588,7 @@ namespace ProjectZeus.Core.Levels
             guanos.Clear();
             gigaBat = null;
             exitPortal = null;
-            cameraOffset = Vector2.Zero;
+            camera.Reset();
         }
     }
 }

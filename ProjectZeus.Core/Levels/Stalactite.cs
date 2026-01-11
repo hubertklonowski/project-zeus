@@ -13,18 +13,11 @@ namespace ProjectZeus.Core.Levels
         public Vector2 Size { get; set; }
         public AsepriteSprite Sprite { get; set; }
         
-        public void Draw(SpriteBatch spriteBatch, Texture2D fallbackTexture, GameTime gameTime)
+        public void Draw(SpriteBatch spriteBatch, GameTime gameTime)
         {
             if (Sprite != null && Sprite.IsLoaded)
             {
-                // Draw using the aseprite sprite
                 Sprite.Draw(spriteBatch, Position, isMoving: false, gameTime, Color.White);
-            }
-            else
-            {
-                // Fallback to simple rectangle
-                Rectangle rect = new Rectangle((int)Position.X, (int)Position.Y, (int)Size.X, (int)Size.Y);
-                spriteBatch.Draw(fallbackTexture, rect, new Color(120, 120, 120));
             }
         }
     }
